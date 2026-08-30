@@ -1,4 +1,13 @@
-# Economy Lab v2.11
+# Economy Lab v2.12
+
+## v2.12.0 — Dense desktop workspace redesign
+
+- Replaced the oversized hub header with a compact desktop topbar, menu bar and collapsible module sidebar.
+- Redesigned Simple Macro around dense policy controls, nine result views and real backend data.
+- Preserved the three simulation levels, modules, Profiles, local projects, exports and SFC authority contracts.
+- Kept optional engines visible with explicit availability states and no Basic-mode blockage.
+- Kept the desktop UI fully local-first by using system fonts and local assets.
+- Retained the Windows GUI subsystem so the release executable opens without a console window.
 
 ## v2.11.0 — Reproducible run manifests and verified replay
 

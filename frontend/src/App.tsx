@@ -7,6 +7,7 @@ import { ValidationWorkspace } from "./components/ValidationWorkspace";
 import { DataCalibrationWorkspace } from "./components/DataCalibrationWorkspace";
 import { ModelBuilderWorkspace } from "./components/ModelBuilderWorkspace";
 import { SimpleMacroWorkspace } from "./components/SimpleMacroWorkspace";
+import { DesktopChrome } from "./components/DesktopChrome";
 
 const initial: ScenarioSpec = {
   name: "Economy Zero",
@@ -421,66 +422,20 @@ export default function App() {
   const activeModuleInfo = modules.find((module) => module.id === activeModule);
 
   return (
-    <main className="shell">
-      <header>
-        <div>
-          <span className="eyebrow">ECONOMY LAB · V1.9 HUB</span>
-          <h1>Economic Simulation Hub</h1>
-          <p>Módulos independentes para simulação, agentes, macroeconomia, SFC/Godley, analytics e cenários.</p>
-          <div className="engineBadges">
-            <span className={health?.mesa_available ? "available" : "missing"}>
-              Mesa {health?.mesa_available ? "disponível" : "não instalado"}
-            </span>
-            <span className={health?.hark_available ? "available" : "missing"}>
-              HARK {health?.hark_available ? "disponível" : "não instalado"}
-            </span>
-            <span className={health?.minsky_rest_configured ? "available" : "missing"}>
-              Minsky {minskyStatus?.reachable ? "conectado" : health?.minsky_rest_configured ? "configurado/offline" : "opcional"}
-            </span>
-            <span className={dynareStatus?.ready ? "available" : "missing"}>
-              Dynare {dynareStatus?.ready ? `pronto${dynareStatus.dynare_version_hint ? ` ${dynareStatus.dynare_version_hint}` : ""}` : "opcional"}
-            </span>
-            {desktopRuntime && (
-              <span className={desktopRuntime.ready ? "available" : "missing"}>
-                Desktop {desktopRuntime.ready ? "backend automático" : "backend com erro"}
-              </span>
-            )}
-          </div>
-        </div>
-        <span className="status">{status}</span>
-      </header>
-
-      <nav className="moduleBar" aria-label="Módulos do Economy Lab">
-        {modules.map((module) => (
-          <button
-            type="button"
-            key={module.id}
-            className={activeModule === module.id ? "moduleTab active" : "moduleTab"}
-            onClick={() => setActiveModule(module.id)}
-          >
-            <span>{module.title}</span>
-            <small className={module.available ? "availableDot" : "missingDot"}>{module.available ? "●" : "○"} {module.kind}</small>
-          </button>
-        ))}
-      </nav>
-
-      {moduleTools.length > 0 && (
-        <nav className="toolBar" aria-label={`Ferramentas de ${activeModule}`}>
-          {moduleTools.map((tool) => (
-            <button
-              type="button"
-              key={tool.id}
-              className={activeTool === tool.id ? "toolTab active" : "toolTab"}
-              onClick={() => { setActiveTool(tool.id); setStatus(`${tool.title} selecionada`); }}
-              title={tool.description}
-            >
-              <span>{tool.title}</span>
-              <small>{tool.output_kinds.join(" · ")}</small>
-            </button>
-          ))}
-        </nav>
-      )}
-
+    <DesktopChrome
+      projectName={projectName}
+      status={status}
+      backendReady={desktopRuntime?.ready ?? health !== null}
+      storageRuns={storage?.runs ?? 0}
+      modules={modules}
+      activeModule={activeModule}
+      activeModuleInfo={activeModuleInfo}
+      tools={moduleTools}
+      activeTool={activeTool}
+      onModule={setActiveModule}
+      onTool={(id, title) => { setActiveTool(id); setStatus(`${title} selecionada`); }}
+      onStatus={setStatus}
+    >
       {activeModule === "simulation" ? (
         activeTool === "simulation-simple" ? (
           <SimpleMacroWorkspace
@@ -1349,6 +1304,6 @@ export default function App() {
           onOpenSimulation={() => setActiveModule("simulation")}
         />
       ) : null}
-    </main>
+    </DesktopChrome>
   );
 }
