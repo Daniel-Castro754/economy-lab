@@ -1,0 +1,8 @@
+ECONOMY LAB v2.11
+
+EconomyLab.exe fica na raiz para ser fácil de localizar.
+Nesta entrega ele é um preview Windows x64; o desktop Tauri completo ainda deve ser compilado no Windows com os scripts do pacote.
+
+BACKEND v2.11
+Depois de concluir o projeto inicial, execute também QUALIFICAR-BACKEND.bat no Windows.
+Os relatórios serão salvos em validation-reports\.
