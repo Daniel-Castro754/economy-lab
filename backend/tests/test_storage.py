@@ -59,6 +59,42 @@ def test_database_schema_status(tmp_path):
     assert status["jobs"] == 0
 
 
+def test_store_operations_close_every_connection(tmp_path):
+    """Regression guard for the ``_session`` connection leak.
+
+    ``sqlite3.Connection`` used as a context manager only commits/rolls back
+    the transaction; it never closes the connection. ``ProjectStore`` opens a
+    fresh connection per call, so without an explicit ``close()`` a
+    long-running desktop backend would leak one file descriptor per request
+    and per job-progress tick. Every connection opened by the store must be
+    closed by the time the call returns.
+    """
+    import sqlite3
+
+    import pytest
+
+    store = ProjectStore(tmp_path / "leak-check.sqlite3")
+    opened: list[sqlite3.Connection] = []
+    original_connect = store._connect
+
+    def tracking_connect() -> sqlite3.Connection:
+        connection = original_connect()
+        opened.append(connection)
+        return connection
+
+    store._connect = tracking_connect  # type: ignore[method-assign]
+
+    spec = ScenarioSpec(name="Leak check", months=1, households=120, firms=8, banks=2)
+    project = store.create_project(name="Leak", description="", scenario=spec)
+    store.status()
+    store.get_project(project["id"])
+
+    assert len(opened) >= 3
+    for connection in opened:
+        with pytest.raises(sqlite3.ProgrammingError):
+            connection.execute("SELECT 1")
+
+
 def test_schema_v1_migrates_to_v5_without_dropping_projects(tmp_path):
     import sqlite3
     path = tmp_path / "legacy-v1.sqlite3"

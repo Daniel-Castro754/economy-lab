@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from uuid import uuid4
 
 from economy_lab.core.schemas import ScenarioSpec, SimulationResult
@@ -51,8 +52,26 @@ class ProjectStore:
         connection.execute("PRAGMA synchronous = NORMAL")
         return connection
 
+    @contextmanager
+    def _session(self) -> Iterator[sqlite3.Connection]:
+        """Open a connection for one unit of work and always close it.
+
+        ``sqlite3.Connection.__enter__``/``__exit__`` only commit or roll back
+        the transaction; they never close the underlying connection/file
+        descriptor. Every store method opens a fresh connection per call (so
+        FastAPI worker threads never share one), so without an explicit
+        ``close()`` here each request/job-progress tick would leak a
+        connection for the lifetime of the desktop process.
+        """
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _initialize(self) -> None:
-        with self._connect() as db:
+        with self._session() as db:
             version = int(db.execute("PRAGMA user_version").fetchone()[0])
             if version > SCHEMA_VERSION:
                 raise RuntimeError(
@@ -210,7 +229,7 @@ class ProjectStore:
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
     def status(self) -> dict[str, Any]:
-        with self._connect() as db:
+        with self._session() as db:
             projects = int(db.execute("SELECT COUNT(*) FROM projects").fetchone()[0])
             runs = int(db.execute("SELECT COUNT(*) FROM runs").fetchone()[0])
             experiments = int(db.execute("SELECT COUNT(*) FROM experiments").fetchone()[0])
@@ -239,7 +258,7 @@ class ProjectStore:
             raise KeyError(project_id)
         job_id = str(uuid4())
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 INSERT INTO jobs(
@@ -265,7 +284,7 @@ class ProjectStore:
         return item
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         if row is None:
             return None
@@ -288,7 +307,7 @@ class ProjectStore:
             values.append(project_id)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         values.append(max(1, min(int(limit), 200)))
-        with self._connect() as db:
+        with self._session() as db:
             rows = db.execute(
                 f"SELECT * FROM jobs{where} ORDER BY created_at DESC, rowid DESC LIMIT ?",
                 values,
@@ -297,7 +316,7 @@ class ProjectStore:
 
     def start_job(self, job_id: str) -> bool:
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -312,7 +331,7 @@ class ProjectStore:
         """Mark work left running by a terminated process as failed."""
 
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -326,7 +345,7 @@ class ProjectStore:
             return cursor.rowcount
 
     def queued_job_ids(self) -> list[str]:
-        with self._connect() as db:
+        with self._session() as db:
             rows = db.execute(
                 "SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at, rowid"
             ).fetchall()
@@ -341,7 +360,7 @@ class ProjectStore:
         current_step: int,
         total_steps: int,
     ) -> bool:
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -361,7 +380,7 @@ class ProjectStore:
             return cursor.rowcount > 0
 
     def cancellation_requested(self, job_id: str) -> bool:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute(
                 "SELECT cancellation_requested FROM jobs WHERE id = ?", (job_id,)
             ).fetchone()
@@ -369,7 +388,7 @@ class ProjectStore:
 
     def request_job_cancel(self, job_id: str) -> dict[str, Any] | None:
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 UPDATE jobs
@@ -392,7 +411,7 @@ class ProjectStore:
         run_id: str | None = None,
     ) -> bool:
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -423,7 +442,7 @@ class ProjectStore:
         manifest, manifest_hash = self._build_manifest(
             scenario=scenario, result=result, engine_version=engine_version
         )
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -486,7 +505,7 @@ class ProjectStore:
 
     def fail_job(self, job_id: str, *, error_code: str, error_message: str) -> bool:
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -500,7 +519,7 @@ class ProjectStore:
 
     def cancel_job(self, job_id: str) -> bool:
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute(
                 """
                 UPDATE jobs
@@ -550,7 +569,7 @@ class ProjectStore:
     ) -> dict[str, Any]:
         project_id = str(uuid4())
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 INSERT INTO projects(id, name, description, scenario_json, created_at, updated_at)
@@ -583,7 +602,7 @@ class ProjectStore:
         next_scenario = current["scenario"] if scenario is None else scenario
         if not isinstance(next_scenario, ScenarioSpec):
             next_scenario = ScenarioSpec.model_validate(next_scenario)
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 UPDATE projects
@@ -601,7 +620,7 @@ class ProjectStore:
         return self.get_project(project_id)
 
     def get_project(self, project_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute(
                 """
                 SELECT p.*,
@@ -615,7 +634,7 @@ class ProjectStore:
         return self._project_row(row, include_scenario=True)
 
     def list_projects(self) -> list[dict[str, Any]]:
-        with self._connect() as db:
+        with self._session() as db:
             rows = db.execute(
                 """
                 SELECT p.*,
@@ -642,7 +661,7 @@ class ProjectStore:
         return payload
 
     def delete_project(self, project_id: str) -> bool:
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
             return cursor.rowcount > 0
 
@@ -667,7 +686,7 @@ class ProjectStore:
         manifest, manifest_hash = self._build_manifest(
             scenario=scenario, result=result, engine_version=engine_version
         )
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 INSERT INTO runs(
@@ -716,7 +735,7 @@ class ProjectStore:
 
     def list_runs(self, project_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 200))
-        with self._connect() as db:
+        with self._session() as db:
             rows = db.execute(
                 """
                 SELECT id, project_id, created_at, duration_ms, engine_version,
@@ -733,7 +752,7 @@ class ProjectStore:
         return [self._run_summary(row) for row in rows]
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
         if row is None:
             return None
@@ -748,7 +767,7 @@ class ProjectStore:
         return payload
 
     def get_run_manifest(self, run_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute(
                 "SELECT manifest_json, manifest_hash FROM runs WHERE id = ?", (run_id,)
             ).fetchone()
@@ -820,7 +839,7 @@ class ProjectStore:
         experiment_id = str(uuid4())
         timestamp = utc_now()
         payload = result.model_dump(mode="json") if hasattr(result, "model_dump") else result
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 INSERT INTO experiments(
@@ -842,7 +861,7 @@ class ProjectStore:
 
     def list_experiments(self, project_id: str, *, limit: int = 30) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 100))
-        with self._connect() as db:
+        with self._session() as db:
             rows = db.execute(
                 """
                 SELECT id, project_id, created_at, axis, values_json, repetitions, total_runs,
@@ -855,7 +874,7 @@ class ProjectStore:
         return [self._experiment_summary(row) for row in rows]
 
     def get_experiment(self, experiment_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute("SELECT * FROM experiments WHERE id = ?", (experiment_id,)).fetchone()
         if row is None:
             return None
@@ -890,7 +909,7 @@ class ProjectStore:
     ) -> dict[str, Any]:
         profile_id = str(uuid4())
         timestamp = utc_now()
-        with self._connect() as db:
+        with self._session() as db:
             db.execute(
                 """
                 INSERT INTO profiles(
@@ -917,7 +936,7 @@ class ProjectStore:
             clauses.append("module_id = ?")
             values.append(module_id)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        with self._connect() as db:
+        with self._session() as db:
             rows = db.execute(
                 "SELECT id, name, description, kind, module_id, compatibility, created_at, updated_at "
                 f"FROM profiles{where} ORDER BY updated_at DESC, created_at DESC",
@@ -926,14 +945,14 @@ class ProjectStore:
         return [self._profile_row(row, include_payload=False) for row in rows]
 
     def get_profile(self, profile_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with self._session() as db:
             row = db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
         if row is None:
             return None
         return self._profile_row(row, include_payload=True)
 
     def delete_profile(self, profile_id: str) -> bool:
-        with self._connect() as db:
+        with self._session() as db:
             cursor = db.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
             return cursor.rowcount > 0
 
