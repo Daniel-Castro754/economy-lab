@@ -1,0 +1,161 @@
+{
+  "schema": "economy-lab-external-validation-v2.7",
+  "report_id": "d297903f-0b34-4a26-aa27-ebfd766429d4",
+  "report_digest": "72d214b762531f54b3c3aeda940b122975cdfc56d6ffbbda5a44e00b77dfa1f8",
+  "generated_at": "2026-08-30T17:06:05.799444+00:00",
+  "economy_lab_version": "2.11.0",
+  "platform": "Linux 6.18.35 (x86_64)",
+  "python_version": "3.12.13",
+  "environment": {
+    "os": "Linux",
+    "os_release": "6.18.35",
+    "os_version": "#1 SMP Fri Aug 21 00:36:21 UTC 2026",
+    "machine": "x86_64",
+    "processor": "x86_64",
+    "python_executable": "/workspace/scratch/01c882bfc6e6/economy-lab-v2.8/backend/.venv/bin/python",
+    "python_implementation": "CPython",
+    "python_bits": 64,
+    "pip_version": null,
+    "configuration_flags": {
+      "OCTAVE_EXECUTABLE": false,
+      "DYNARE_MATLAB_PATH": false,
+      "MINSKY_REST_URL": false
+    }
+  },
+  "requested_engines": [
+    "mesa",
+    "hark",
+    "dynare",
+    "minsky"
+  ],
+  "smoke_tests": true,
+  "integration_tests": true,
+  "status": "partial",
+  "qualification_ready": false,
+  "passed": 0,
+  "failed": 0,
+  "unavailable": 4,
+  "runtime_verified": 0,
+  "read_only_verified": 0,
+  "checks": [
+    {
+      "engine": "mesa",
+      "status": "unavailable",
+      "installed_or_configured": false,
+      "version": null,
+      "duration_ms": 1.17,
+      "summary": "Mesa não está instalado neste runtime.",
+      "details": {
+        "target_version": "3.5.1"
+      },
+      "error": null,
+      "qualification_level": "none",
+      "compatibility": "unknown",
+      "target_version": "3.5.1",
+      "integrated_smoke_passed": false,
+      "stages": [
+        {
+          "name": "detect-import",
+          "status": "unavailable",
+          "duration_ms": 0.06,
+          "summary": "Mesa não está instalado neste runtime.",
+          "details": {
+            "observed_version": null,
+            "target_version": "3.5.1"
+          },
+          "error": null
+        }
+      ]
+    },
+    {
+      "engine": "hark",
+      "status": "unavailable",
+      "installed_or_configured": false,
+      "version": null,
+      "duration_ms": 0.29,
+      "summary": "Econ-ARK/HARK não está instalado neste runtime.",
+      "details": {
+        "target_version": "0.17.2"
+      },
+      "error": null,
+      "qualification_level": "none",
+      "compatibility": "unknown",
+      "target_version": "0.17.2",
+      "integrated_smoke_passed": false,
+      "stages": [
+        {
+          "name": "detect-import",
+          "status": "unavailable",
+          "duration_ms": 0.04,
+          "summary": "Econ-ARK/HARK não está instalado neste runtime.",
+          "details": {
+            "observed_version": null,
+            "target_version": "0.17.2"
+          },
+          "error": null
+        }
+      ]
+    },
+    {
+      "engine": "dynare",
+      "status": "unavailable",
+      "installed_or_configured": false,
+      "version": null,
+      "duration_ms": 0.25,
+      "summary": "Dynare/Octave não está pronto para execução.",
+      "details": {
+        "octave_executable": null,
+        "dynare_matlab_path": null,
+        "dynare_version_hint": null
+      },
+      "error": "GNU Octave não encontrado; defina OCTAVE_EXECUTABLE se necessário; pasta matlab do Dynare não encontrada; defina DYNARE_MATLAB_PATH",
+      "qualification_level": "none",
+      "compatibility": "unknown",
+      "target_version": "7.x",
+      "integrated_smoke_passed": false,
+      "stages": [
+        {
+          "name": "detect-runtime",
+          "status": "unavailable",
+          "duration_ms": 0.0,
+          "summary": "Dynare/Octave não está pronto para execução.",
+          "details": {
+            "octave_executable": null,
+            "dynare_matlab_path": null,
+            "dynare_version_hint": null
+          },
+          "error": "GNU Octave não encontrado; defina OCTAVE_EXECUTABLE se necessário; pasta matlab do Dynare não encontrada; defina DYNARE_MATLAB_PATH"
+        }
+      ]
+    },
+    {
+      "engine": "minsky",
+      "status": "unavailable",
+      "installed_or_configured": false,
+      "version": null,
+      "duration_ms": 0.02,
+      "summary": "MINSKY_REST_URL não está configurado.",
+      "details": {
+        "object_type": null,
+        "model_time": null,
+        "read_only_smoke": true,
+        "rest_url_configured": false
+      },
+      "error": null,
+      "qualification_level": "none",
+      "compatibility": "unknown",
+      "target_version": null,
+      "integrated_smoke_passed": false,
+      "stages": [
+        {
+          "name": "rest-handshake",
+          "status": "unavailable",
+          "duration_ms": 0.0,
+          "summary": "MINSKY_REST_URL não está configurado.",
+          "details": {},
+          "error": null
+        }
+      ]
+    }
+  ]
+}

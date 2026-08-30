@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "economy-lab"
+version = "2.11.0"
+description = "Local-first hybrid economic simulation engine"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "uvicorn[standard]>=0.35,<1",
+  "pydantic>=2.11,<3",
+  "numpy>=2.2,<3",
+  "scipy>=1.15,<2",
+]
+
+[project.optional-dependencies]
+simulation = [
+  "mesa==3.5.1",
+  "econ-ark==0.17.2",
+]
+desktop = [
+  "pyinstaller>=6.15,<7",
+]
+analytics = [
+  "duckdb>=1.4,<2",
+]
+dev = [
+  "pytest>=8.4,<9",
+  "httpx>=0.28,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["economy_lab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

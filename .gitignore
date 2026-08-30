@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Tauri/Rust
+src-tauri/target/
+
+# Local data
+*.db
+*.duckdb
+.env
+.venv-desktop/
+backend/dist-sidecar/
+backend/build-sidecar/
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
