@@ -162,6 +162,36 @@ def test_job_timeout_becomes_failed_with_timeout_code(tmp_path):
     assert failed["error_code"] == "timeout"
 
 
+def test_shutdown_signals_cancellation_instead_of_blocking_on_timeout(tmp_path):
+    """Regression guard: shutdown() used to only stop the executor's queue.
+
+    A running job kept executing (and process exit would block on it, since
+    ThreadPoolExecutor joins its worker threads at interpreter exit) until it
+    hit its own timeout_seconds. shutdown() must set every live cancel event
+    first so a job blocked in a checkpoint stops at its next monthly step.
+    """
+    store = ProjectStore(tmp_path / "shutdown-signal.sqlite3")
+    entered = Event()
+
+    def cancellable_runner(spec, *, execution_control):
+        entered.set()
+        while True:
+            execution_control.checkpoint("simulating", progress=20)
+            sleep(0.005)
+
+    manager = SimulationJobManager(store, max_workers=1, runner=cancellable_runner)
+    submitted = manager.submit(demo_spec(), timeout_seconds=30)
+    assert entered.wait(1)
+
+    started = monotonic()
+    manager.shutdown(wait=True)
+    elapsed = monotonic() - started
+
+    assert elapsed < 5.0, "shutdown() waited near the job's 30s timeout instead of cancelling it"
+    finished = wait_for_job(store, submitted["id"])
+    assert finished["status"] == "cancelled"
+
+
 def test_jobs_api_submit_poll_list_and_terminal_cancel(tmp_path, monkeypatch):
     store = ProjectStore(tmp_path / "api-jobs.sqlite3")
     manager = SimulationJobManager(store, max_workers=1)

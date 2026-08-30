@@ -78,7 +78,21 @@ class SimulationJobManager:
         return refreshed
 
     def shutdown(self, *, wait: bool = True) -> None:
-        self._executor.shutdown(wait=wait, cancel_futures=False)
+        """Stop accepting work and unblock any threads waiting on a checkpoint.
+
+        Setting every live cancel event first makes shutdown prompt: a job
+        blocked in ``SimulationExecutionControl.checkpoint`` raises
+        ``SimulationCancelledError`` at its next monthly step instead of
+        running to completion or to its full timeout. Without this, process
+        exit would stall (Python's ``ThreadPoolExecutor`` joins all worker
+        threads at interpreter shutdown) for as long as the slowest running
+        job's remaining timeout_seconds.
+        """
+        with self._lock:
+            events = list(self._events.values())
+        for event in events:
+            event.set()
+        self._executor.shutdown(wait=wait, cancel_futures=True)
 
     def _schedule(self, job_id: str) -> None:
         event = Event()
@@ -193,3 +207,17 @@ def get_job_manager() -> SimulationJobManager:
             manager = SimulationJobManager(ProjectStore(path), max_workers=workers)
             _managers[key] = manager
         return manager
+
+
+def shutdown_all_job_managers(*, wait: bool = False) -> None:
+    """Signal cancellation and stop every job manager created in this process.
+
+    Call this from the ASGI shutdown hook and the desktop shutdown callback so
+    closing the app does not leave background simulation threads running (or
+    block process exit on them) past the request that asked the server to stop.
+    """
+    with _managers_lock:
+        managers = list(_managers.values())
+        _managers.clear()
+    for manager in managers:
+        manager.shutdown(wait=wait)
