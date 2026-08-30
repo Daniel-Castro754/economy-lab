@@ -15,6 +15,9 @@ src-tauri/target/
 *.db
 *.duckdb
 .env
+.env.local
+.env.*.local
+*.tsbuildinfo
 .venv-desktop/
 backend/dist-sidecar/
 backend/build-sidecar/
