@@ -38,6 +38,40 @@ API:
 
 See `docs/REPRODUCIBILITY_V211.md`, `docs/SIMULATION_JOBS_V210.md`, `docs/ROADMAP.md` and `docs/PROJECT_PROGRESS.md`.
 
-## Executável na raiz
+## Running it
 
-`EconomyLab.exe` is kept directly in the package root beside `backend`, `docs`, `frontend`, `scripts` and `src-tauri` so it is easy to locate. This package still carries the Windows x64 preview executable; the final full Tauri build is part of the backend/release qualification sequence before v3.0.
+### Dev mode (any OS, no build required)
+
+Two terminals:
+
+```powershell
+# terminal 1 — backend (Python 3.12)
+powershell -ExecutionPolicy Bypass -File scripts\dev-backend.ps1
+
+# terminal 2 — frontend
+powershell -ExecutionPolicy Bypass -File scripts\dev-web.ps1
+```
+
+Open `http://127.0.0.1:5173`. On macOS/Linux, run the equivalent commands
+inside each script manually (`py -3.12`/`python3.12` venv + `uvicorn
+economy_lab.main:app --reload`, then `npm install && npm run dev` in
+`frontend`).
+
+### Windows desktop installer
+
+There is no prebuilt executable committed to this repository — compiled
+binaries are build output, not source, and don't belong in git history.
+Instead, the [`Desktop installer`](.github/workflows/desktop-installer.yml)
+GitHub Actions workflow builds one on a Windows runner and:
+
+- uploads it as a workflow artifact on every manual run (Actions tab →
+  *Desktop installer* → *Run workflow*), or
+- publishes it to the repository's [Releases](../../releases) page when a
+  `v*` tag is pushed.
+
+The installer bundles the Python backend as a PyInstaller sidecar, so it
+needs nothing preinstalled on the target machine — no Python, Node or Rust.
+See `docs/DESKTOP_RUNTIME.md` for how the sidecar and shutdown handshake work,
+and `scripts/build-desktop.ps1` if you want to build one locally on Windows
+(requires Python 3.12, Node.js and the Rust/MSVC toolchain — check with `npm
+run desktop:check`).

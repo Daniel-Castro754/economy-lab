@@ -1,7 +1,24 @@
 ECONOMY LAB v2.11
 
-EconomyLab.exe fica na raiz para ser fácil de localizar.
-Nesta entrega ele é um preview Windows x64; o desktop Tauri completo ainda deve ser compilado no Windows com os scripts do pacote.
+Este repositório contém apenas código-fonte; nenhum EconomyLab.exe é
+distribuído dentro do próprio git (binários compilados não pertencem ao
+histórico de versionamento).
+
+Para obter o instalador Windows (.exe/.msi):
+  1. Abra a aba "Actions" do repositório no GitHub.
+  2. Rode o workflow "Desktop installer" manualmente (Run workflow), ou
+     aguarde uma tag de versão (vX.Y.Z) publicar um Release automaticamente.
+  3. Baixe o instalador em Releases ou nos artefatos do workflow e execute-o
+     — ele já traz o backend Python embutido, não precisa instalar Python,
+     Node nem Rust na máquina de destino.
+
+Para rodar sem instalar nada (modo desenvolvimento, veja o README.md):
+  scripts\dev-backend.ps1   (backend em http://127.0.0.1:8765)
+  scripts\dev-web.ps1       (frontend em http://127.0.0.1:5173)
+
+Para compilar o instalador você mesmo em uma máquina Windows:
+  npm run desktop:check   (confere Python 3.12, Node, Rust/Cargo)
+  npm run desktop:build
 
 BACKEND v2.11
 Depois de concluir o projeto inicial, execute também QUALIFICAR-BACKEND.bat no Windows.
