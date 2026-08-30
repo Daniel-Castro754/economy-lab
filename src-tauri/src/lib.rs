@@ -95,13 +95,7 @@ fn wait_for_health(port: u16, instance_id: &str, timeout: Duration) -> bool {
 
 fn request_graceful_shutdown(port: u16, token: &str) -> bool {
     let request = format!(
-        concat!(
-            "POST /api/v1/runtime/shutdown HTTP/1.1\r\n",
-            "Host: 127.0.0.1:{port}\r\n",
-            "X-Economy-Lab-Shutdown-Token: {token}\r\n",
-            "Content-Length: 0\r\n",
-            "Connection: close\r\n\r\n"
-        )
+        "POST /api/v1/runtime/shutdown HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-Economy-Lab-Shutdown-Token: {token}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     );
     http_exchange(port, &request)
         .map(|response| response.starts_with("HTTP/1.1 200"))
@@ -187,7 +181,7 @@ pub fn run() {
                                 state.ready.store(false, Ordering::SeqCst);
                                 if let Ok(mut slot) = state.last_error.lock() {
                                     *slot = Some(error);
-                                }
+                                };
                             }
                             CommandEvent::Terminated(payload) => {
                                 let state = handle.state::<BackendRuntime>();
@@ -198,7 +192,7 @@ pub fn run() {
                                             "Backend encerrado inesperadamente (code={:?}, signal={:?})",
                                             payload.code, payload.signal
                                         ));
-                                    }
+                                    };
                                 }
                             }
                             _ => {}
