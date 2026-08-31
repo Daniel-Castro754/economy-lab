@@ -389,7 +389,7 @@ export default function App() {
       case "validation": setActiveModule("validation"); setStatus("Diagnóstico de motores selecionado"); break;
       case "data": case "calibration": setActiveModule("data-calibration"); setStatus("Dados e calibração selecionados"); break;
       case "help": setStatus("Consulte README.md e a pasta docs incluídos no pacote completo"); break;
-      case "about": setStatus("Economy Lab 2.12.1 · laboratório econômico local e auditável"); break;
+      case "about": setStatus("Economy Lab 2.13.0 · laboratório econômico local e auditável"); break;
       default: setStatus("Ação indisponível");
     }
   }

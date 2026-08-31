@@ -22,6 +22,12 @@ const resultTabs = [
   ["sfc", "SFC/Godley"], ["comparacoes", "Comparações"], ["auditoria", "Auditoria"],
 ] as const;
 
+const scenarioMeta: Record<string, { eyebrow: string; accent: string }> = {
+  baseline: { eyebrow: "BASE", accent: "Estável" },
+  global_recession: { eyebrow: "CHOQUE", accent: "Recessivo" },
+  volatile: { eyebrow: "RISCO", accent: "Volátil" },
+};
+
 function pct(value: number) { return `${value.toFixed(1)}%`; }
 
 function ApprovalGauge({ value }: { value: number }) {
@@ -29,7 +35,10 @@ function ApprovalGauge({ value }: { value: number }) {
 }
 
 function MiniTrend({ years }: { years: SimpleYearResult[] }) {
-  if (!years.length) return null;
+  if (!years.length) return <div className="chartEmptyState">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/></svg>
+    <div><strong>Série temporal ainda não iniciada</strong><span>Escolha o cenário, ajuste as decisões e simule o primeiro ano.</span></div>
+  </div>;
   const width = 760, height = 220, left = 48, right = 16, top = 18, bottom = 34;
   const metrics = [
     { key: "real_gdp_growth", label: "PIB", stroke: "#38bdf8" },
@@ -122,30 +131,32 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
   return <section className="simpleMacroShell">
     <div className="simpleGrid">
       <div className="panel controls">
-        <div className="panelHeader"><strong>Decisões de política — ano {(state?.year ?? 0) + 1}</strong><span>Simple Macro</span></div>
+        <div className="panelHeader"><div><small>POLÍTICA ECONÔMICA</small><strong>Decisões — ano {(state?.year ?? 0) + 1}</strong></div><span>Simple Macro</span></div>
         <div className="controlBody">
-          <label>Cenário externo
-            <select disabled={!scenarios.length} value={config?.scenario_id ?? "baseline"} onChange={e => void reset(e.target.value as "baseline" | "global_recession" | "volatile")}>
-              {!scenarios.length && <option value="baseline">Cenários indisponíveis</option>}
-              {scenarios.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-            </select>
-          </label>
+          <div className="fieldHeading"><span>Cenário externo</span><small>Condições globais para os 7 anos</small></div>
+          <div className="scenarioPicker" role="radiogroup" aria-label="Cenário externo">
+            {scenarios.map(s => <button type="button" role="radio" aria-checked={config?.scenario_id === s.id} key={s.id} className={config?.scenario_id === s.id ? "scenarioChoice active" : "scenarioChoice"} onClick={() => void reset(s.id as "baseline" | "global_recession" | "volatile")}>
+              <span>{scenarioMeta[s.id]?.eyebrow ?? "CENÁRIO"}</span><strong>{s.title}</strong><small>{scenarioMeta[s.id]?.accent ?? "Externo"}</small>
+            </button>)}
+            {!scenarios.length && <div className="scenarioSkeleton">Carregando cenários externos…</div>}
+          </div>
           {scenarioError && <div className="inlineError"><span>{scenarioError}</span><button type="button" className="secondaryButton" onClick={() => { void loadScenarios(); void reset(config?.scenario_id ?? "baseline"); }}>Tentar novamente</button></div>}
           <p className="muted compactHelp">{scenarioInfo?.description}</p>
 
           <div className="externalCard">
-            <strong>{state?.year === 7 ? "Simulação concluída" : `Ano ${(state?.year ?? 0) + 1} de 7`}</strong>
-            {nextExternal && <><span>{nextExternal.label}</span><div className="externalStats"><div><small>Crescimento mundial</small><b>{pct(nextExternal.world_growth)}</b></div><div><small>Confiança</small><b>{nextExternal.consumer_confidence.toFixed(0)}/100</b></div></div></>}
+            <div className="externalCardHeader"><div><span>CONDIÇÕES EXTERNAS</span><strong>{nextExternal?.label ?? "Aguardando dados"}</strong></div><em>{state?.year === 7 ? "Concluído" : `Ano ${(state?.year ?? 0) + 1}/7`}</em></div>
+            {nextExternal && <div className="externalStats"><div><small>Crescimento mundial</small><b>{pct(nextExternal.world_growth)}</b></div><div><small>Confiança do consumidor</small><b>{nextExternal.consumer_confidence.toFixed(0)}<i>/100</i></b></div></div>}
           </div>
 
-          <div className="subsectionLabel">SUAS DECISÕES</div>
-          <div className="simpleDecisionGrid">
+          <div className="policyGroup"><div className="policyGroupTitle"><span>MONETÁRIA</span><small>Banco Central</small></div><div className="simpleDecisionGrid oneColumn">
             <label>Taxa de juros<input className="numberInput" type="number" step="0.25" value={decision.interest_rate} onChange={e => setDecision({...decision, interest_rate:Number(e.target.value)})}/><small>% a.a.</small></label>
+          </div></div>
+          <div className="policyGroup"><div className="policyGroupTitle"><span>FISCAL</span><small>Governo</small></div><div className="simpleDecisionGrid">
             <label>Imposto de renda<input className="numberInput" type="number" step="1" value={decision.income_tax} onChange={e => setDecision({...decision, income_tax:Number(e.target.value)})}/><small>% renda</small></label>
             <label>Imposto corporativo<input className="numberInput" type="number" step="1" value={decision.corporate_tax} onChange={e => setDecision({...decision, corporate_tax:Number(e.target.value)})}/><small>% lucro</small></label>
-            <label>Gasto público<input className="numberInput" type="number" step="0.5" value={decision.government_spending} onChange={e => setDecision({...decision, government_spending:Number(e.target.value)})}/><small>% do PIB</small></label>
-          </div>
-          <div className="simpleActions"><button type="button" onClick={runYear} disabled={!state || state.year >= 7}>{state?.year === 7 ? "7 anos concluídos" : `Simular ano ${(state?.year ?? 0)+1}`}</button><button type="button" className="secondaryButton" onClick={() => void reset(config?.scenario_id ?? "baseline")}>Reiniciar</button></div>
+            <label className="wideField">Gasto público<input className="numberInput" type="number" step="0.5" value={decision.government_spending} onChange={e => setDecision({...decision, government_spending:Number(e.target.value)})}/><small>% do PIB</small></label>
+          </div></div>
+          <div className="simpleActions stickyActions"><button type="button" className="runSimulationButton" onClick={runYear} disabled={!state || state.year >= 7}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 6 9 6-9 6z"/></svg>{state?.year === 7 ? "7 anos concluídos" : `Simular ano ${(state?.year ?? 0)+1}`}</button><button type="button" className="secondaryButton" onClick={() => void reset(config?.scenario_id ?? "baseline")} title="Reiniciar simulação" aria-label="Reiniciar simulação"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div>
           <small className="muted">Execução local, determinística e registrada no histórico da sessão.</small>
         </div>
       </div>
@@ -153,7 +164,7 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
       <div className="panel simpleResults">
         <div className="simpleResultTabs">{resultTabs.map(([id,label]) => <button type="button" key={id} className={resultTab === id ? "active" : ""} onClick={() => setResultTab(id)}>{label}</button>)}</div>
         <div className="resultBody">
-          <div className="projectTitle"><strong>{resultTabs.find(([id]) => id === resultTab)?.[1]}</strong><span className="muted">{latest ? `Ano ${latest.year}` : "Condições iniciais"}</span></div>
+          <div className="projectTitle resultTitle"><div><span>RESULTADOS ANALÍTICOS</span><strong>{resultTabs.find(([id]) => id === resultTab)?.[1]}</strong></div><span className="resultPeriod">{latest ? `Ano ${latest.year} de 7` : "Condições iniciais"}</span></div>
           {state && !unavailableHere && <div className="simpleKpis">
             {(resultTab === "fiscal" || resultTab === "visao" || resultTab === "series") && <><div><small>Crescimento PIB</small><strong>{pct(state.real_gdp_growth)}</strong></div><div><small>Déficit / PIB</small><strong>{pct(state.budget_deficit_to_gdp)}</strong></div><div><small>Dívida / PIB</small><strong>{pct(state.debt_to_gdp)}</strong></div></>}
             {(resultTab === "monetario" || resultTab === "visao" || resultTab === "series") && <div><small>Inflação</small><strong>{pct(state.inflation)}</strong></div>}

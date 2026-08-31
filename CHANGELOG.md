@@ -1,3 +1,14 @@
+# Economy Lab v2.13
+
+## v2.13.0 — Tabler-inspired compact desktop design
+
+- Reorganiza a navegação em Simulation Lab, Modelagem, Análise e Trabalho local, preservando todas as rotas e terminologia.
+- Substitui símbolos inconsistentes por uma família local de ícones SVG no estilo Tabler, sem dependência visual externa.
+- Adiciona cabeçalho de página, estados semânticos de módulos, ações globais e hierarquia mais clara entre módulo e ferramenta.
+- Transforma os cenários externos do Simple Macro em opções visuais alimentadas pela API e mantém erro/nova tentativa explícitos.
+- Agrupa decisões monetárias e fiscais, melhora KPIs e adiciona estado vazio orientado para a primeira simulação.
+- Mantém Ledger/SFC como autoridade contábil única e motores externos visíveis mesmo quando não instalados.
+
 # Economy Lab v2.12
 
 ## v2.12.1 — Functional desktop connectivity audit

@@ -151,7 +151,7 @@ class SimulationJobManager:
                     scenario=scenario,
                     result=result,
                     duration_ms=(perf_counter() - started) * 1000.0,
-                    engine_version="2.12.1",
+                    engine_version="2.13.0",
                     save_scenario=bool(item["save_scenario"]),
                 )
                 if run_id is None:

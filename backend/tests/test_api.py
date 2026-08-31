@@ -11,7 +11,7 @@ def test_health_endpoint():
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["engine_version"] == "2.12.1"
+    assert payload["engine_version"] == "2.13.0"
 
 
 def test_desktop_webview_origin_is_allowed_by_cors():

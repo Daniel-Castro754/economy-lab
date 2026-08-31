@@ -213,7 +213,7 @@ def test_replay_api_matches_source_run(tmp_path, monkeypatch):
     project = store.create_project(name="Replay", description="", scenario=spec)
     source = store.save_run(
         project_id=project["id"], scenario=spec, result=run_simulation(spec),
-        duration_ms=1, engine_version="2.12.1"
+        duration_ms=1, engine_version="2.13.0"
     )
     monkeypatch.setattr(routes, "_project_store", lambda: store)
 

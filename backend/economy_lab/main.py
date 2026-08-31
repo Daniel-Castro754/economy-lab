@@ -18,7 +18,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Economy Lab API",
-    version="2.12.1",
+    version="2.13.0",
     description="Local-first economic simulation kernel API",
     lifespan=lifespan,
 )
