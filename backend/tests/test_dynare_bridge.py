@@ -39,10 +39,9 @@ def test_parse_dynare_irfs_from_results_mat(tmp_path: Path):
     assert points[-1].period == 3
 
 
-def test_monthly_guidance_is_explicit_hold_not_hidden_interpolation():
-    results = Path("/tmp/not-used")
+def test_monthly_guidance_is_explicit_hold_not_hidden_interpolation(tmp_path: Path):
     # Reuse the IRF dataclass through a tiny synthetic .mat to exercise public API.
-    temp = Path("/tmp/economy_lab_test_irf.mat")
+    temp = tmp_path / "economy_lab_test_irf.mat"
     savemat(
         temp,
         {"oo_": {"irfs": {"x_e_i": [-0.2], "pi_e_i": [-0.1], "i_e_i": [1.0]}}},
@@ -52,7 +51,6 @@ def test_monthly_guidance_is_explicit_hold_not_hidden_interpolation():
     assert len(monthly) == 3
     assert [item["month"] for item in monthly] == [1.0, 2.0, 3.0]
     assert all(item["output_gap"] == -0.2 for item in monthly)
-    temp.unlink(missing_ok=True)
 
 
 def test_hybrid_coupler_applies_bounded_policy_and_records_feedback():
