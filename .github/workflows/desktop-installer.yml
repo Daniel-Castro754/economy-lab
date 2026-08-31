@@ -18,6 +18,8 @@ on:
         type: boolean
         default: false
   push:
+    branches:
+      - "codex/build-v2-13-0"
     tags:
       - "v*"
 
@@ -43,6 +45,12 @@ jobs:
             frontend/package-lock.json
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run backend tests
+        shell: pwsh
+        run: |
+          python -m pip install "./backend[dev]"
+          python -m pytest -q backend/tests
 
       - uses: Swatinem/rust-cache@v2
         with:
