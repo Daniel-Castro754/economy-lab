@@ -562,3 +562,187 @@ details summary:hover { color: var(--accent); }
   .simpleKpis { grid-template-columns: repeat(2, minmax(120px,1fr)); }
   .simpleHero { flex-direction: column; }
 }
+
+/* v2.12 — dense desktop workspace, derived from the approved prototype */
+:root {
+  --bg: #16181c;
+  --surface: #1d2025;
+  --surface-raised: #22262c;
+  --surface-sunken: #1a1d21;
+  --surface-well: #171a1e;
+  --line: #2e333a;
+  --line-soft: #262b31;
+  --text: #dfe3e8;
+  --text-muted: #9aa3ad;
+  --text-faint: #6f7883;
+  --accent: #5b95d6;
+  --accent-strong: #4b83c4;
+  --accent-ink: #eef4fa;
+  --accent-soft: rgba(91,149,214,.14);
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-pill: 999px;
+  --shadow-panel: none;
+}
+
+html, body, #root { height: 100%; }
+body {
+  min-width: 900px;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--bg);
+  font-family: "Segoe UI", Inter, system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  font-feature-settings: "tnum" 1;
+}
+
+.desktopApp { display: flex; flex-direction: column; width: 100%; height: 100vh; overflow: hidden; background: var(--bg); }
+.desktopTopbar { height: 38px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+.brandMark { display: grid; place-items: center; width: 18px; height: 18px; color: var(--accent); font-size: 16px; }
+.buildLabel, .topLabel { color: var(--text-faint); }
+.topDivider { width: 1px; height: 18px; margin: 0 4px; background: var(--line); }
+.projectName { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.localBadge { padding: 1px 5px; color: var(--text-muted); border: 1px solid #3a4048; border-radius: 3px; font-size: 10.5px; }
+.saveState, .backendState { display: inline-flex; align-items: center; gap: 5px; color: #7ea88c; }
+.backendState.missing { color: #c9a227; }
+.saveState i, .backendState i { width: 6px; height: 6px; border-radius: 50%; background: #4f9d69; }
+.backendState.missing i { background: #c9a227; }
+.topSpacer { flex: 1; min-width: 4px; }
+.desktopTopbar button, .desktopMenubar button, .moduleSidebar button, .workspaceToolbar button { box-shadow: none; transform: none; }
+.topAction, .iconAction { height: 24px; min-height: 24px; padding: 0 8px; border-radius: 3px; font-size: 11.5px; }
+.topAction.primary { background: transparent; border: 1px solid #3a4048; color: #c6ccd3; }
+.topAction.primary:hover:not(:disabled) { background: #262b31; border-color: #4a525c; filter: none; transform: none; }
+.iconAction { display: grid; place-items: center; width: 24px; padding: 0; color: var(--text-muted); background: transparent; border: 1px solid transparent; }
+.iconAction:hover:not(:disabled) { color: var(--text); background: #262b31; filter: none; transform: none; }
+
+.desktopMenubar { position: relative; z-index: 40; height: 29px; flex: none; display: flex; align-items: stretch; padding: 0 6px; background: var(--surface-sunken); border-bottom: 1px solid var(--line); color: var(--text-faint); white-space: nowrap; }
+.desktopMenubar > span { align-self: center; margin: 0 6px; font-size: 10.5px; }
+.menuRoot { position: relative; }
+.menuButton { height: 28px; padding: 0 8px; color: #b3bbc4; background: transparent; border: 0; border-radius: 0; font-weight: 400; font-size: 11.5px; }
+.menuButton:hover:not(:disabled), .menuButton.open { color: var(--text); background: #262b31; filter: none; transform: none; }
+.menuPopover { position: absolute; left: 0; top: 29px; z-index: 80; width: 230px; padding: 4px; background: #22262c; border: 1px solid #3a4048; border-radius: 3px; box-shadow: 0 12px 32px rgba(0,0,0,.42); }
+.menuPopover button { width: 100%; height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; color: #c6ccd3; background: transparent; border: 0; border-radius: 2px; font-weight: 400; font-size: 11.5px; }
+.menuPopover button:hover:not(:disabled) { background: #2a2f36; filter: none; transform: none; }
+.menuPopover small { color: var(--text-faint); }
+
+.desktopBody { display: flex; flex: 1; min-height: 0; }
+.moduleSidebar { width: 194px; flex: none; display: flex; flex-direction: column; background: #1a1d21; border-right: 1px solid var(--line); transition: width .15s ease; overflow: hidden; }
+.moduleSidebar.collapsed { width: 44px; }
+.sidebarHeading { height: 27px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; color: var(--text-faint); font-size: 10px; letter-spacing: .08em; }
+.sidebarHeading button { width: 20px; height: 20px; display: grid; place-items: center; padding: 0; color: #7d8792; background: transparent; border: 0; border-radius: 3px; }
+.sidebarHeading button:hover:not(:disabled) { color: var(--text); background: #262b31; filter: none; transform: none; }
+.moduleSidebar nav { display: grid; gap: 1px; }
+.sidebarModule { width: 100%; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px; color: #b3bbc4; background: transparent; border: 0; border-left: 2px solid transparent; border-radius: 0; font-weight: 400; text-align: left; }
+.sidebarModule:hover:not(:disabled) { color: var(--text); background: #262b31; filter: none; transform: none; }
+.sidebarModule.active { color: #e7ecf1; background: #2b4257; border-left-color: var(--accent); }
+.moduleGlyph { width: 16px; flex: none; color: #9aa3ad; text-align: center; font-family: Consolas, monospace; font-size: 14px; }
+.sidebarModule.active .moduleGlyph { color: #cfe2f5; }
+.sidebarModuleText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moduleDot { display: inline-block; width: 6px; height: 6px; flex: none; border-radius: 50%; }
+.moduleDot.ready { background: #4f9d69; }
+.moduleDot.offline { background: #c9a227; }
+.moduleDot.missing { background: #c05a4d; }
+.moduleDot.optional { background: transparent; border: 1px solid #6f7883; }
+.stateLegend { display: grid; gap: 4px; margin: auto 8px 8px; padding: 7px 8px; color: var(--text-muted); background: #181b1f; border: 1px solid var(--line); border-radius: 4px; font-size: 10.5px; }
+.stateLegend strong { color: var(--text-faint); font-size: 9.5px; letter-spacing: .06em; margin-bottom: 2px; }
+.stateLegend span { display: flex; align-items: center; gap: 6px; }
+
+.desktopWorkspace { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.workspaceToolbar { min-height: 41px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 10px; background: var(--surface-sunken); border-bottom: 1px solid var(--line); overflow: hidden; }
+.workspaceIdentity { min-width: 180px; max-width: 420px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
+.workspaceIdentity strong { flex: none; font-size: 12.5px; }
+.workspaceIdentity span { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; }
+.workspaceTools { margin-left: auto; display: flex; align-self: stretch; overflow-x: auto; }
+.workspaceTool { height: 40px; padding: 0 9px; color: #8b939d; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 400; font-size: 11px; white-space: nowrap; }
+.workspaceTool:hover:not(:disabled) { color: var(--text); background: #20242a; filter: none; transform: none; }
+.workspaceTool.active { color: var(--text); border-bottom-color: var(--accent); background: #20242a; font-weight: 600; }
+.desktopContent { flex: 1; min-height: 0; overflow: auto; padding: 10px; }
+.desktopStatusbar { height: 24px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 10px; color: var(--text-faint); background: #1a1d21; border-top: 1px solid var(--line); font-size: 10.5px; }
+
+/* Dense treatment for every existing functional workspace */
+.desktopContent .grid { grid-template-columns: 318px minmax(0,1fr); gap: 10px; align-items: start; }
+.desktopContent .grid.two { grid-template-columns: 1fr 1fr; }
+.desktopContent .panel { padding: 10px; background: var(--surface); border-radius: 4px; box-shadow: none; }
+.desktopContent .controls { gap: 10px; }
+.desktopContent .controls > h2, .desktopContent .moduleHero h2 { margin: 0; font-size: 17px; }
+.desktopContent p { line-height: 1.4; }
+.desktopContent select, .desktopContent input[type="text"], .desktopContent input[type="number"], .desktopContent input[type="date"], .desktopContent textarea, .desktopContent .numberInput { min-height: 27px; padding: 4px 7px; color: var(--text); background: var(--surface-well); border-color: #3a4048; border-radius: 3px; font-size: 11.5px; }
+.desktopContent input[type="number"], .desktopContent .numberInput { font-family: Consolas, "Cascadia Mono", monospace; font-variant-numeric: tabular-nums; }
+.desktopContent button { min-height: 28px; padding: 4px 10px; border-radius: 3px; box-shadow: none; font-size: 11.5px; }
+.desktopContent button:hover:not(:disabled) { transform: none; }
+.desktopContent table { font-size: 11px; }
+.desktopContent th { padding: 6px 7px; color: #8b939d; background: #1d2025; font-weight: 500; }
+.desktopContent td { padding: 5px 7px; font-variant-numeric: tabular-nums; }
+.desktopContent .moduleWorkspace { min-height: 0; }
+.desktopContent .moduleHero { gap: 12px; }
+.desktopContent .moduleStatus { padding: 4px 8px; border-radius: 3px; font-size: 10.5px; }
+.desktopContent .moduleColumns { gap: 12px; margin-top: 14px; }
+.desktopContent .capabilityGrid { gap: 5px; }
+.desktopContent .capabilityGrid span { padding: 7px 8px; border-radius: 3px; }
+.desktopContent .moduleActions { margin-top: 12px; }
+.desktopContent .labGrid { gap: 12px; margin-top: 14px; padding-top: 12px; }
+.desktopContent .chartCard { padding: 8px; border-radius: 4px; }
+.desktopContent .profileBox, .desktopContent .batchBox, .desktopContent .projectBox { border-radius: 4px; }
+
+/* Simple Macro — functional data inside the approved dense layout */
+.simpleMacroShell { gap: 8px; }
+.simpleGrid { grid-template-columns: 318px minmax(0,1fr); gap: 10px; align-items: start; }
+.simpleGrid > .panel { padding: 0; overflow: hidden; }
+.panelHeader { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; background: var(--surface-raised); border-bottom: 1px solid var(--line); }
+.panelHeader span { padding: 1px 5px; color: var(--text-muted); border: 1px solid #3a4048; border-radius: 3px; font-size: 10px; }
+.controlBody { display: grid; gap: 9px; padding: 9px 10px; }
+.controlBody > label, .simpleDecisionGrid label { display: grid; gap: 3px; color: var(--text-muted); font-size: 11px; }
+.compactHelp { margin: -4px 0 0; font-size: 10.5px; }
+.externalCard { gap: 5px; padding: 7px 8px; border-radius: 3px; }
+.inlineError { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 1px solid #7f1d1d; border-radius: 3px; background: #2a1718; color: #fecaca; font-size: 11px; }
+.inlineError button { flex: 0 0 auto; padding: 5px 8px; }
+.externalCard > span { color: var(--text-muted); font-size: 10.5px; }
+.externalStats { gap: 6px; }
+.externalStats div { padding: 5px 6px; background: #181b1f; border: 1px solid #292e34; border-radius: 3px; }
+.externalStats b { font-family: Consolas, monospace; font-size: 12px; }
+.simpleDecisionGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 8px; }
+.simpleDecisionGrid label { position: relative; }
+.simpleDecisionGrid label small { position: absolute; right: 7px; bottom: 7px; color: var(--text-faint); pointer-events: none; font-size: 9px; }
+.simpleDecisionGrid input { padding-right: 52px !important; text-align: right; }
+.simpleActions { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.simpleResults { min-width: 0; }
+.simpleResultTabs { display: flex; overflow-x: auto; padding: 0 6px; background: var(--surface-raised); border-bottom: 1px solid var(--line); }
+.simpleResultTabs button { height: 30px; min-height: 30px; padding: 0 8px; color: #8b939d; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 400; white-space: nowrap; }
+.simpleResultTabs button:hover:not(:disabled) { color: var(--text); background: #262b31; filter: none; }
+.simpleResultTabs button.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.resultBody { display: grid; gap: 8px; padding: 9px 10px 10px; }
+.simpleKpis { grid-template-columns: repeat(auto-fit,minmax(104px,1fr)); gap: 6px; margin: 0; }
+.simpleKpis div { padding: 7px 8px; border-radius: 3px; }
+.simpleKpis strong { font-family: Consolas, "Cascadia Mono", monospace; font-size: 17px; font-weight: 500; }
+.approvalBlock { grid-template-columns: 70px 1fr; gap: 8px; margin: 0; }
+.approvalGauge { height: 24px; border-radius: 3px; }
+.approvalFill { background: #4f9d69; opacity: .72; }
+.resultNarrative { display: grid; grid-template-columns: minmax(0,1fr) minmax(220px,.75fr); gap: 8px; }
+.explainBox, .simpleAlerts { margin: 0; padding: 7px 8px; background: #1a1d21; border: 1px solid var(--line); border-radius: 3px; }
+.explainBox { border-left: 2px solid var(--accent); }
+.explainBox p, .simpleAlerts p { margin: 5px 0 0; font-size: 10.5px; }
+.simpleAlerts .warning { padding: 5px 7px; border-radius: 0 3px 3px 0; }
+.simpleHistory { max-height: 210px; overflow: auto; border: 1px solid var(--line); border-radius: 3px; }
+.simpleExportActions { padding-top: 7px; border-top: 1px solid var(--line); }
+.levelNotice, .auditSummary { min-height: 180px; display: grid; place-items: start; align-content: center; gap: 8px; padding: 20px; background: #1a1d21; border: 1px solid var(--line); border-radius: 3px; }
+.levelNotice p, .auditSummary p { max-width: 680px; margin: 0; }
+.auditSummary .ledgerState { margin: 0; }
+.simpleDisclaimer { margin: 0; padding: 0 2px; font-size: 10px; }
+.chartSvg { max-height: 205px; }
+.gridLine { stroke: #292e34; }
+.axisText { fill: var(--text-faint); font-family: Consolas, monospace; font-size: 10px; }
+
+@media (max-width: 1120px) {
+  .desktopMenubar > span:not(.topSpacer), .saveState { display: none; }
+  .workspaceIdentity span { display: none; }
+  .moduleSidebar { width: 174px; }
+  .resultNarrative { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 980px) {
+  .simpleGrid, .desktopContent .grid { grid-template-columns: 290px minmax(0,1fr); }
+  .projectName, .localBadge { display: none; }
+}

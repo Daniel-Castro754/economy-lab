@@ -126,7 +126,7 @@ router = APIRouter()
 def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
-        engine_version="2.11.0",
+        engine_version="2.12.1",
         mesa_available=mesa_available(),
         hark_available=hark_available(),
         minsky_rest_configured=minsky_rest_configured(),
@@ -438,7 +438,7 @@ def validate_external_engines_route(request: ExternalValidationRequest) -> Exter
         integration_tests=request.integration_tests,
         dynare_timeout_seconds=request.dynare_timeout_seconds,
         minsky_timeout_seconds=request.minsky_timeout_seconds,
-        economy_lab_version="2.11.0",
+        economy_lab_version="2.12.1",
     )
     return ExternalValidationReportResponse(**report.to_dict())
 
@@ -838,7 +838,7 @@ def replay_run(run_id: str) -> ReplayResponse:
         scenario=scenario,
         result=result,
         duration_ms=(perf_counter() - started) * 1000.0,
-        engine_version="2.11.0",
+        engine_version="2.12.1",
         save_scenario=False,
         replay_of_run_id=run_id,
     )
@@ -899,7 +899,7 @@ def simulate_project(project_id: str, request: ProjectRunRequest) -> ProjectSimu
         scenario=spec,
         result=result,
         duration_ms=duration_ms,
-        engine_version="2.11.0",
+        engine_version="2.12.1",
         save_scenario=request.save_scenario,
     )
     refreshed = store.get_project(project_id)
@@ -959,7 +959,7 @@ def run_project_experiment(project_id: str, request: ProjectBatchRequest) -> Exp
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except DynareExecutionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    item = store.save_experiment(project_id=project_id, result=result, engine_version="2.11.0")
+    item = store.save_experiment(project_id=project_id, result=result, engine_version="2.12.1")
     return ExperimentRecord(**item)
 
 

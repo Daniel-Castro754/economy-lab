@@ -7,6 +7,7 @@ import { ValidationWorkspace } from "./components/ValidationWorkspace";
 import { DataCalibrationWorkspace } from "./components/DataCalibrationWorkspace";
 import { ModelBuilderWorkspace } from "./components/ModelBuilderWorkspace";
 import { SimpleMacroWorkspace } from "./components/SimpleMacroWorkspace";
+import { DesktopChrome } from "./components/DesktopChrome";
 
 const initial: ScenarioSpec = {
   name: "Economy Zero",
@@ -367,6 +368,38 @@ export default function App() {
     }
   }
 
+  function onChromeAction(action: string) {
+    const openSimulation = (tool: string, message: string) => {
+      setActiveModule("simulation");
+      setActiveTool(tool);
+      setStatus(message);
+    };
+    switch (action) {
+      case "new-project": onNewProject(); break;
+      case "open-project": case "project": case "history": case "profiles": openSimulation("simulation-run", "Projetos, histórico e Profiles disponíveis no painel do Simulation Lab"); break;
+      case "simple": openSimulation("simulation-simple", "Simple Macro selecionado"); break;
+      case "economy-zero": openSimulation("simulation-run", "Economy Zero selecionado"); break;
+      case "advanced": openSimulation("simulation-run", "Configuração Hybrid / Advanced aberta"); break;
+      case "batch": openSimulation("simulation-batch", "Experimentos em lote selecionados"); break;
+      case "shocks": case "presets": openSimulation("simulation-run", "Configuração de cenários aberta"); break;
+      case "simulation": case "results": openSimulation("simulation-run", "Simulation Lab selecionado"); break;
+      case "replay": openSimulation("simulation-replay", "Manifestos e reprodutibilidade selecionados"); break;
+      case "scenario-ai": setActiveModule("scenario-ai"); setActiveTool("scenario-compiler"); setStatus("Compilador de cenário selecionado"); break;
+      case "dynare": case "minsky": case "mesa": case "hark": setActiveModule(action); setStatus(`${action.toUpperCase()} Lab selecionado`); break;
+      case "validation": setActiveModule("validation"); setStatus("Diagnóstico de motores selecionado"); break;
+      case "data": case "calibration": setActiveModule("data-calibration"); setStatus("Dados e calibração selecionados"); break;
+      case "help": setStatus("Consulte README.md e a pasta docs incluídos no pacote completo"); break;
+      case "about": setStatus("Economy Lab 2.12.1 · laboratório econômico local e auditável"); break;
+      default: setStatus("Ação indisponível");
+    }
+  }
+
+  function onChromeExport() {
+    if (batchResult) { void onExportBatch("xlsx"); return; }
+    if (result) { void onExportSimulation("xlsx"); return; }
+    setStatus("Execute uma simulação antes de exportar; no Simple Macro use os botões do painel após o primeiro ano");
+  }
+
   async function refreshProfiles() {
     setProfiles(await listProfiles());
     setStorage(await getStorageStatus());
@@ -421,66 +454,23 @@ export default function App() {
   const activeModuleInfo = modules.find((module) => module.id === activeModule);
 
   return (
-    <main className="shell">
-      <header>
-        <div>
-          <span className="eyebrow">ECONOMY LAB · V1.9 HUB</span>
-          <h1>Economic Simulation Hub</h1>
-          <p>Módulos independentes para simulação, agentes, macroeconomia, SFC/Godley, analytics e cenários.</p>
-          <div className="engineBadges">
-            <span className={health?.mesa_available ? "available" : "missing"}>
-              Mesa {health?.mesa_available ? "disponível" : "não instalado"}
-            </span>
-            <span className={health?.hark_available ? "available" : "missing"}>
-              HARK {health?.hark_available ? "disponível" : "não instalado"}
-            </span>
-            <span className={health?.minsky_rest_configured ? "available" : "missing"}>
-              Minsky {minskyStatus?.reachable ? "conectado" : health?.minsky_rest_configured ? "configurado/offline" : "opcional"}
-            </span>
-            <span className={dynareStatus?.ready ? "available" : "missing"}>
-              Dynare {dynareStatus?.ready ? `pronto${dynareStatus.dynare_version_hint ? ` ${dynareStatus.dynare_version_hint}` : ""}` : "opcional"}
-            </span>
-            {desktopRuntime && (
-              <span className={desktopRuntime.ready ? "available" : "missing"}>
-                Desktop {desktopRuntime.ready ? "backend automático" : "backend com erro"}
-              </span>
-            )}
-          </div>
-        </div>
-        <span className="status">{status}</span>
-      </header>
-
-      <nav className="moduleBar" aria-label="Módulos do Economy Lab">
-        {modules.map((module) => (
-          <button
-            type="button"
-            key={module.id}
-            className={activeModule === module.id ? "moduleTab active" : "moduleTab"}
-            onClick={() => setActiveModule(module.id)}
-          >
-            <span>{module.title}</span>
-            <small className={module.available ? "availableDot" : "missingDot"}>{module.available ? "●" : "○"} {module.kind}</small>
-          </button>
-        ))}
-      </nav>
-
-      {moduleTools.length > 0 && (
-        <nav className="toolBar" aria-label={`Ferramentas de ${activeModule}`}>
-          {moduleTools.map((tool) => (
-            <button
-              type="button"
-              key={tool.id}
-              className={activeTool === tool.id ? "toolTab active" : "toolTab"}
-              onClick={() => { setActiveTool(tool.id); setStatus(`${tool.title} selecionada`); }}
-              title={tool.description}
-            >
-              <span>{tool.title}</span>
-              <small>{tool.output_kinds.join(" · ")}</small>
-            </button>
-          ))}
-        </nav>
-      )}
-
+    <DesktopChrome
+      projectName={projectName}
+      status={status}
+      backendReady={desktopRuntime?.ready ?? health !== null}
+      storageRuns={storage?.runs ?? 0}
+      modules={modules}
+      activeModule={activeModule}
+      activeModuleInfo={activeModuleInfo}
+      tools={moduleTools}
+      activeTool={activeTool}
+      onModule={setActiveModule}
+      onTool={(id, title) => { setActiveTool(id); setStatus(`${title} selecionada`); }}
+      onSave={() => { void onSaveProject(); }}
+      onExport={onChromeExport}
+      onAction={onChromeAction}
+      onStatus={setStatus}
+    >
       {activeModule === "simulation" ? (
         activeTool === "simulation-simple" ? (
           <SimpleMacroWorkspace
@@ -1349,6 +1339,6 @@ export default function App() {
           onOpenSimulation={() => setActiveModule("simulation")}
         />
       ) : null}
-    </main>
+    </DesktopChrome>
   );
 }

@@ -11,7 +11,19 @@ def test_health_endpoint():
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["engine_version"] == "2.11.0"
+    assert payload["engine_version"] == "2.12.1"
+
+
+def test_desktop_webview_origin_is_allowed_by_cors():
+    response = client.options(
+        "/api/v1/simple/scenarios",
+        headers={
+            "Origin": "http://tauri.localhost",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://tauri.localhost"
 
 
 def test_simulate_economy_zero_endpoint():

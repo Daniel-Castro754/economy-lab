@@ -16,6 +16,11 @@ import {
 
 const defaultConfig: Partial<SimpleInitialConfig> = { scenario_id: "baseline" };
 const defaultDecision: SimplePolicyDecision = { interest_rate: 4, income_tax: 20, corporate_tax: 22, government_spending: 22 };
+const resultTabs = [
+  ["visao", "Visão geral"], ["series", "Séries temporais"], ["setores", "Setores e agentes"],
+  ["fiscal", "Fiscal"], ["monetario", "Monetário"], ["bancos", "Bancos"],
+  ["sfc", "SFC/Godley"], ["comparacoes", "Comparações"], ["auditoria", "Auditoria"],
+] as const;
 
 function pct(value: number) { return `${value.toFixed(1)}%`; }
 
@@ -53,8 +58,22 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
   const [decision, setDecision] = useState<SimplePolicyDecision>(defaultDecision);
   const [years, setYears] = useState<SimpleYearResult[]>([]);
   const [warning, setWarning] = useState("");
+  const [scenarioError, setScenarioError] = useState("");
+  const [resultTab, setResultTab] = useState<(typeof resultTabs)[number][0]>("visao");
 
-  useEffect(() => { listSimpleScenarios().then(setScenarios).catch(() => setScenarios([])); }, []);
+  async function loadScenarios() {
+    setScenarioError("");
+    try {
+      const items = await listSimpleScenarios();
+      setScenarios(items);
+      if (!items.length) setScenarioError("O backend não retornou cenários externos.");
+    } catch (error) {
+      setScenarios([]);
+      setScenarioError(error instanceof Error ? error.message : "Falha ao carregar cenários externos.");
+    }
+  }
+
+  useEffect(() => { void loadScenarios(); }, []);
   useEffect(() => { void reset("baseline"); }, []);
 
   async function reset(scenarioId: "baseline" | "global_recession" | "volatile") {
@@ -64,7 +83,11 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
       setConfig(started.config); setState(started.state); setInitialState(started.state); setNextExternal(started.next_external); setYears([]); setWarning(started.warning);
       setDecision({ interest_rate: started.config.neutral_interest_rate, income_tax: started.config.baseline_income_tax, corporate_tax: started.config.baseline_corporate_tax, government_spending: started.config.baseline_government_spending });
       onStatus("Simulação simples pronta");
-    } catch (e) { onStatus(e instanceof Error ? e.message : "Falha ao iniciar modo simples"); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha ao iniciar modo simples";
+      setScenarioError(message);
+      onStatus(message);
+    }
   }
 
   async function runYear() {
@@ -93,52 +116,62 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
 
   const latest = years.at(-1);
   const scenarioInfo = scenarios.find(s => s.id === config?.scenario_id);
+  const hasMacroDetail = resultTab === "visao" || resultTab === "series";
+  const unavailableHere = ["setores", "bancos", "sfc"].includes(resultTab);
 
   return <section className="simpleMacroShell">
-    <div className="simpleHero">
-      <div><span className="eyebrow">Nível 1 · Simulação simples</span><h2>Política macro em 7 anos</h2><p>Quatro decisões por ano, ambiente externo e feedback imediato. Sem agentes, Godley ou motores externos.</p></div>
-      <div className="levelSwitcher"><span className="levelActive">1 · Simples</span><span>2 · Economy Zero</span><span>3 · Hybrid</span></div>
-    </div>
-
     <div className="simpleGrid">
       <div className="panel controls">
-        <h3>Cenário externo</h3>
-        <select value={config?.scenario_id ?? "baseline"} onChange={e => void reset(e.target.value as any)}>
-          {scenarios.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-        </select>
-        <p className="muted">{scenarioInfo?.description}</p>
+        <div className="panelHeader"><strong>Decisões de política — ano {(state?.year ?? 0) + 1}</strong><span>Simple Macro</span></div>
+        <div className="controlBody">
+          <label>Cenário externo
+            <select disabled={!scenarios.length} value={config?.scenario_id ?? "baseline"} onChange={e => void reset(e.target.value as "baseline" | "global_recession" | "volatile")}>
+              {!scenarios.length && <option value="baseline">Cenários indisponíveis</option>}
+              {scenarios.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </select>
+          </label>
+          {scenarioError && <div className="inlineError"><span>{scenarioError}</span><button type="button" className="secondaryButton" onClick={() => { void loadScenarios(); void reset(config?.scenario_id ?? "baseline"); }}>Tentar novamente</button></div>}
+          <p className="muted compactHelp">{scenarioInfo?.description}</p>
 
-        <div className="externalCard">
-          <strong>{state?.year === 7 ? "Simulação concluída" : `Ano ${(state?.year ?? 0) + 1} de 7`}</strong>
-          {nextExternal && <><span>{nextExternal.label}</span><div className="externalStats"><div><small>Crescimento mundial</small><b>{pct(nextExternal.world_growth)}</b></div><div><small>Confiança</small><b>{nextExternal.consumer_confidence.toFixed(0)}/100</b></div></div></>}
+          <div className="externalCard">
+            <strong>{state?.year === 7 ? "Simulação concluída" : `Ano ${(state?.year ?? 0) + 1} de 7`}</strong>
+            {nextExternal && <><span>{nextExternal.label}</span><div className="externalStats"><div><small>Crescimento mundial</small><b>{pct(nextExternal.world_growth)}</b></div><div><small>Confiança</small><b>{nextExternal.consumer_confidence.toFixed(0)}/100</b></div></div></>}
+          </div>
+
+          <div className="subsectionLabel">SUAS DECISÕES</div>
+          <div className="simpleDecisionGrid">
+            <label>Taxa de juros<input className="numberInput" type="number" step="0.25" value={decision.interest_rate} onChange={e => setDecision({...decision, interest_rate:Number(e.target.value)})}/><small>% a.a.</small></label>
+            <label>Imposto de renda<input className="numberInput" type="number" step="1" value={decision.income_tax} onChange={e => setDecision({...decision, income_tax:Number(e.target.value)})}/><small>% renda</small></label>
+            <label>Imposto corporativo<input className="numberInput" type="number" step="1" value={decision.corporate_tax} onChange={e => setDecision({...decision, corporate_tax:Number(e.target.value)})}/><small>% lucro</small></label>
+            <label>Gasto público<input className="numberInput" type="number" step="0.5" value={decision.government_spending} onChange={e => setDecision({...decision, government_spending:Number(e.target.value)})}/><small>% do PIB</small></label>
+          </div>
+          <div className="simpleActions"><button type="button" onClick={runYear} disabled={!state || state.year >= 7}>{state?.year === 7 ? "7 anos concluídos" : `Simular ano ${(state?.year ?? 0)+1}`}</button><button type="button" className="secondaryButton" onClick={() => void reset(config?.scenario_id ?? "baseline")}>Reiniciar</button></div>
+          <small className="muted">Execução local, determinística e registrada no histórico da sessão.</small>
         </div>
-
-        <h3>Suas decisões</h3>
-        <label>Taxa de juros (%)<input className="numberInput" type="number" step="0.25" value={decision.interest_rate} onChange={e => setDecision({...decision, interest_rate:Number(e.target.value)})}/></label>
-        <label>Imposto de renda (%)<input className="numberInput" type="number" step="1" value={decision.income_tax} onChange={e => setDecision({...decision, income_tax:Number(e.target.value)})}/></label>
-        <label>Imposto corporativo (%)<input className="numberInput" type="number" step="1" value={decision.corporate_tax} onChange={e => setDecision({...decision, corporate_tax:Number(e.target.value)})}/></label>
-        <label>Gasto público (% do PIB)<input className="numberInput" type="number" step="0.5" value={decision.government_spending} onChange={e => setDecision({...decision, government_spending:Number(e.target.value)})}/></label>
-        <button type="button" onClick={runYear} disabled={!state || state.year >= 7}>{state?.year === 7 ? "7 anos concluídos" : `Simular ano ${(state?.year ?? 0)+1}`}</button>
-        <button type="button" className="secondaryButton" onClick={() => void reset(config?.scenario_id ?? "baseline")}>Reiniciar</button>
       </div>
 
       <div className="panel simpleResults">
-        <div className="projectTitle"><strong>Resultados</strong><span className="muted">{latest ? `Ano ${latest.year}` : "Condições iniciais"}</span></div>
-        {state && <div className="simpleKpis">
-          <div><small>Crescimento PIB</small><strong>{pct(state.real_gdp_growth)}</strong></div>
-          <div><small>Inflação</small><strong>{pct(state.inflation)}</strong></div>
-          <div><small>Desemprego</small><strong>{pct(state.unemployment)}</strong></div>
-          <div><small>Déficit / PIB</small><strong>{pct(state.budget_deficit_to_gdp)}</strong></div>
-          <div><small>Dívida / PIB</small><strong>{pct(state.debt_to_gdp)}</strong></div>
-        </div>}
-        {state && <div className="approvalBlock"><span>Aprovação</span><ApprovalGauge value={state.approval}/></div>}
-        {latest && <div className="explainBox"><strong>O que aconteceu</strong>{latest.explanation.map((x,i)=><p key={i}>{x}</p>)}{latest.warnings.map((x,i)=><p className="warningText" key={`w${i}`}>{x}</p>)}</div>}
-        <MiniTrend years={years}/>
-        {years.length > 0 && <div className="projectActions"><button type="button" className="secondaryButton" onClick={() => void exportFile("csv")}>CSV</button><button type="button" className="secondaryButton" onClick={() => void exportFile("xlsx")}>Excel</button><button type="button" onClick={() => void promote()}>Analisar no Economy Zero</button></div>}
+        <div className="simpleResultTabs">{resultTabs.map(([id,label]) => <button type="button" key={id} className={resultTab === id ? "active" : ""} onClick={() => setResultTab(id)}>{label}</button>)}</div>
+        <div className="resultBody">
+          <div className="projectTitle"><strong>{resultTabs.find(([id]) => id === resultTab)?.[1]}</strong><span className="muted">{latest ? `Ano ${latest.year}` : "Condições iniciais"}</span></div>
+          {state && !unavailableHere && <div className="simpleKpis">
+            {(resultTab === "fiscal" || resultTab === "visao" || resultTab === "series") && <><div><small>Crescimento PIB</small><strong>{pct(state.real_gdp_growth)}</strong></div><div><small>Déficit / PIB</small><strong>{pct(state.budget_deficit_to_gdp)}</strong></div><div><small>Dívida / PIB</small><strong>{pct(state.debt_to_gdp)}</strong></div></>}
+            {(resultTab === "monetario" || resultTab === "visao" || resultTab === "series") && <div><small>Inflação</small><strong>{pct(state.inflation)}</strong></div>}
+            {(resultTab === "visao" || resultTab === "series") && <div><small>Desemprego</small><strong>{pct(state.unemployment)}</strong></div>}
+          </div>}
+          {unavailableHere && <div className="levelNotice"><strong>Detalhamento disponível no Economy Zero e Hybrid/Advanced</strong><p>O Simple Macro não simula agentes, bancos ou matrizes SFC. Promova o cenário para acessar esses resultados sem inventar dados nesta tela.</p><button type="button" onClick={() => void promote()}>Enviar ao Economy Zero</button></div>}
+          {resultTab === "comparacoes" && <div className="levelNotice"><strong>Compare após gerar mais de uma execução</strong><p>Use o histórico local e os experimentos em lote no Economy Zero para comparar seeds e parâmetros.</p></div>}
+          {resultTab === "auditoria" && <div className="auditSummary"><span className="ledgerState ok">✓ Simple Macro consistente</span><p>{warning}</p><p className="muted">Sem Ledger/Godley neste nível. A auditoria SFC completa é aplicada nos níveis 2 e 3.</p></div>}
+          {hasMacroDetail && <>
+            {state && <div className="approvalBlock"><span>Aprovação</span><ApprovalGauge value={state.approval}/></div>}
+            <MiniTrend years={years}/>
+            {latest && resultTab === "visao" && <div className="resultNarrative"><div className="explainBox"><strong>Leitura do resultado</strong>{latest.explanation.map((x,i)=><p key={i}>{x}</p>)}</div><div className="simpleAlerts"><strong>Alertas econômicos</strong>{latest.warnings.length ? latest.warnings.map((x,i)=><p className="warning" key={`w${i}`}>{x}</p>) : <p className="muted">Nenhum alerta crítico neste ano.</p>}</div></div>}
+          </>}
+          {years.length > 0 && ["visao","series","fiscal","monetario"].includes(resultTab) && <div className="tableWrap simpleHistory"><table><thead><tr><th>Ano</th><th>PIB</th><th>Inflação</th><th>Desemprego</th><th>Déficit</th><th>Dívida</th><th>Aprovação</th></tr></thead><tbody>{years.map(y => <tr key={y.year}><td>{y.year}</td><td>{pct(y.state.real_gdp_growth)}</td><td>{pct(y.state.inflation)}</td><td>{pct(y.state.unemployment)}</td><td>{pct(y.state.budget_deficit_to_gdp)}</td><td>{pct(y.state.debt_to_gdp)}</td><td>{y.state.approval.toFixed(0)}</td></tr>)}</tbody></table></div>}
+          {years.length > 0 && <div className="projectActions simpleExportActions"><button type="button" className="secondaryButton" onClick={() => void exportFile("csv")}>Exportar CSV</button><button type="button" className="secondaryButton" onClick={() => void exportFile("xlsx")}>Exportar Excel</button><button type="button" onClick={() => void promote()}>Enviar cenário ao Economy Zero</button></div>}
+        </div>
       </div>
     </div>
-
-    {years.length > 0 && <div className="panel"><h3>Histórico</h3><div className="tableWrap"><table><thead><tr><th>Ano</th><th>PIB</th><th>Inflação</th><th>Desemprego</th><th>Déficit</th><th>Dívida</th><th>Aprovação</th></tr></thead><tbody>{years.map(y => <tr key={y.year}><td>{y.year}</td><td>{pct(y.state.real_gdp_growth)}</td><td>{pct(y.state.inflation)}</td><td>{pct(y.state.unemployment)}</td><td>{pct(y.state.budget_deficit_to_gdp)}</td><td>{pct(y.state.debt_to_gdp)}</td><td>{y.state.approval.toFixed(0)}</td></tr>)}</tbody></table></div></div>}
     <p className="muted simpleDisclaimer">{warning}</p>
   </section>;
 }
