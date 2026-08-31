@@ -58,9 +58,22 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
   const [decision, setDecision] = useState<SimplePolicyDecision>(defaultDecision);
   const [years, setYears] = useState<SimpleYearResult[]>([]);
   const [warning, setWarning] = useState("");
+  const [scenarioError, setScenarioError] = useState("");
   const [resultTab, setResultTab] = useState<(typeof resultTabs)[number][0]>("visao");
 
-  useEffect(() => { listSimpleScenarios().then(setScenarios).catch(() => setScenarios([])); }, []);
+  async function loadScenarios() {
+    setScenarioError("");
+    try {
+      const items = await listSimpleScenarios();
+      setScenarios(items);
+      if (!items.length) setScenarioError("O backend não retornou cenários externos.");
+    } catch (error) {
+      setScenarios([]);
+      setScenarioError(error instanceof Error ? error.message : "Falha ao carregar cenários externos.");
+    }
+  }
+
+  useEffect(() => { void loadScenarios(); }, []);
   useEffect(() => { void reset("baseline"); }, []);
 
   async function reset(scenarioId: "baseline" | "global_recession" | "volatile") {
@@ -70,7 +83,11 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
       setConfig(started.config); setState(started.state); setInitialState(started.state); setNextExternal(started.next_external); setYears([]); setWarning(started.warning);
       setDecision({ interest_rate: started.config.neutral_interest_rate, income_tax: started.config.baseline_income_tax, corporate_tax: started.config.baseline_corporate_tax, government_spending: started.config.baseline_government_spending });
       onStatus("Simulação simples pronta");
-    } catch (e) { onStatus(e instanceof Error ? e.message : "Falha ao iniciar modo simples"); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha ao iniciar modo simples";
+      setScenarioError(message);
+      onStatus(message);
+    }
   }
 
   async function runYear() {
@@ -108,10 +125,12 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
         <div className="panelHeader"><strong>Decisões de política — ano {(state?.year ?? 0) + 1}</strong><span>Simple Macro</span></div>
         <div className="controlBody">
           <label>Cenário externo
-            <select value={config?.scenario_id ?? "baseline"} onChange={e => void reset(e.target.value as "baseline" | "global_recession" | "volatile")}>
+            <select disabled={!scenarios.length} value={config?.scenario_id ?? "baseline"} onChange={e => void reset(e.target.value as "baseline" | "global_recession" | "volatile")}>
+              {!scenarios.length && <option value="baseline">Cenários indisponíveis</option>}
               {scenarios.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
           </label>
+          {scenarioError && <div className="inlineError"><span>{scenarioError}</span><button type="button" className="secondaryButton" onClick={() => { void loadScenarios(); void reset(config?.scenario_id ?? "baseline"); }}>Tentar novamente</button></div>}
           <p className="muted compactHelp">{scenarioInfo?.description}</p>
 
           <div className="externalCard">

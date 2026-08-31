@@ -697,6 +697,8 @@ body {
 .controlBody > label, .simpleDecisionGrid label { display: grid; gap: 3px; color: var(--text-muted); font-size: 11px; }
 .compactHelp { margin: -4px 0 0; font-size: 10.5px; }
 .externalCard { gap: 5px; padding: 7px 8px; border-radius: 3px; }
+.inlineError { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 1px solid #7f1d1d; border-radius: 3px; background: #2a1718; color: #fecaca; font-size: 11px; }
+.inlineError button { flex: 0 0 auto; padding: 5px 8px; }
 .externalCard > span { color: var(--text-muted); font-size: 10.5px; }
 .externalStats { gap: 6px; }
 .externalStats div { padding: 5px 6px; background: #181b1f; border: 1px solid #292e34; border-radius: 3px; }

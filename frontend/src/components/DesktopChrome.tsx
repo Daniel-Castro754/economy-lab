@@ -14,19 +14,22 @@ type DesktopChromeProps = {
   activeTool: string;
   onModule: (id: string) => void;
   onTool: (id: string, title: string) => void;
+  onSave: () => void;
+  onExport: () => void;
+  onAction: (action: string) => void;
   onStatus: (message: string) => void;
 };
 
 const menus = [
-  { label: "Arquivo", items: ["Novo projeto", "Abrir projeto local", "Salvar", "Exportar"] },
-  { label: "Projetos", items: ["Projeto atual", "Histórico de execuções", "Experimentos em lote"] },
-  { label: "Modelos", items: ["Simple Macro", "Economy Zero", "Hybrid / Advanced", "Profiles"] },
-  { label: "Cenários", items: ["Cenário em linguagem natural", "Choques programados", "Presets"] },
-  { label: "Simulação", items: ["Executar", "Comparar execuções", "Reprodutibilidade"] },
-  { label: "Módulos externos", items: ["Dynare", "Minsky", "Mesa", "HARK", "Compatibilidade"] },
-  { label: "Dados e calibração", items: ["Fontes públicas", "Metas", "Ajuste limitado"] },
-  { label: "Resultados", items: ["Painel de resultados", "Auditoria SFC/Godley", "Exportações"] },
-  { label: "Ajuda", items: ["Documentação local", "Sobre o Economy Lab"] },
+  { label: "Arquivo", items: [["new-project", "Novo projeto"], ["open-project", "Abrir projeto local"], ["save", "Salvar"], ["export", "Exportar"]] },
+  { label: "Projetos", items: [["project", "Projeto atual"], ["history", "Histórico de execuções"], ["batch", "Experimentos em lote"]] },
+  { label: "Modelos", items: [["simple", "Simple Macro"], ["economy-zero", "Economy Zero"], ["advanced", "Hybrid / Advanced"], ["profiles", "Profiles"]] },
+  { label: "Cenários", items: [["scenario-ai", "Cenário em linguagem natural"], ["shocks", "Choques programados"], ["presets", "Presets"]] },
+  { label: "Simulação", items: [["simulation", "Executar"], ["batch", "Comparar execuções"], ["replay", "Reprodutibilidade"]] },
+  { label: "Módulos externos", items: [["dynare", "Dynare"], ["minsky", "Minsky"], ["mesa", "Mesa"], ["hark", "HARK"], ["validation", "Compatibilidade"]] },
+  { label: "Dados e calibração", items: [["data", "Fontes públicas"], ["calibration", "Metas"], ["calibration", "Ajuste limitado"]] },
+  { label: "Resultados", items: [["results", "Painel de resultados"], ["results", "Auditoria SFC/Godley"], ["export", "Exportações"]] },
+  { label: "Ajuda", items: [["help", "Documentação local"], ["about", "Sobre o Economy Lab"]] },
 ];
 
 const moduleGlyphs: Record<string, string> = {
@@ -50,7 +53,7 @@ function moduleState(module: HubModuleInfo) {
 
 export function DesktopChrome({
   children, projectName, status, backendReady, storageRuns, modules, activeModule,
-  activeModuleInfo, tools, activeTool, onModule, onTool, onStatus,
+  activeModuleInfo, tools, activeTool, onModule, onTool, onSave, onExport, onAction, onStatus,
 }: DesktopChromeProps) {
   const [navOpen, setNavOpen] = useState(true);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -58,15 +61,15 @@ export function DesktopChrome({
   return <main className="desktopApp">
     <div className="desktopTopbar">
       <div className="brandMark" aria-hidden="true">△</div>
-      <strong>Economy Lab</strong><span className="buildLabel">2.12.0</span>
+      <strong>Economy Lab</strong><span className="buildLabel">2.12.1</span>
       <span className="topDivider" />
       <span className="topLabel">Projeto:</span><strong className="projectName">{projectName || "Projeto não salvo"}</strong>
       <span className="localBadge">SQLite local</span>
       <span className="saveState"><i /> Salvo localmente</span>
       <span className={backendReady ? "backendState ready" : "backendState missing"}><i /> {backendReady ? "Backend local pronto" : "Backend indisponível"}</span>
       <span className="topSpacer" />
-      <button type="button" className="topAction primary" onClick={() => onStatus("Projeto salvo localmente")}>Salvar</button>
-      <button type="button" className="iconAction" title="Exportar" onClick={() => onStatus("Use as ações de exportação do painel ativo")}>⇩</button>
+      <button type="button" className="topAction primary" onClick={onSave}>Salvar</button>
+      <button type="button" className="iconAction" title="Exportar" onClick={onExport}>⇩</button>
       <button type="button" className="iconAction" title="Configurações" onClick={() => onStatus("Configurações do laboratório")}>⚙</button>
       <button type="button" className="iconAction" title="Ajuda" onClick={() => onStatus("Documentação local do Economy Lab")}>?</button>
     </div>
@@ -75,7 +78,7 @@ export function DesktopChrome({
       {menus.map((menu, index) => <div className="menuRoot" key={menu.label}>
         <button type="button" className={openMenu === index ? "menuButton open" : "menuButton"} onClick={() => setOpenMenu(openMenu === index ? null : index)}>{menu.label}</button>
         {openMenu === index && <div className="menuPopover">
-          {menu.items.map(item => <button type="button" key={item} onClick={() => { onStatus(`${item} selecionado`); setOpenMenu(null); }}><span>{item}</span><small>›</small></button>)}
+          {menu.items.map(([action, item]) => <button type="button" key={`${action}-${item}`} onClick={() => { if (action === "save") onSave(); else if (action === "export") onExport(); else onAction(action); setOpenMenu(null); }}><span>{item}</span><small>›</small></button>)}
         </div>}
       </div>)}
       <span className="topSpacer" />

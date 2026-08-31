@@ -368,6 +368,38 @@ export default function App() {
     }
   }
 
+  function onChromeAction(action: string) {
+    const openSimulation = (tool: string, message: string) => {
+      setActiveModule("simulation");
+      setActiveTool(tool);
+      setStatus(message);
+    };
+    switch (action) {
+      case "new-project": onNewProject(); break;
+      case "open-project": case "project": case "history": case "profiles": openSimulation("simulation-run", "Projetos, histórico e Profiles disponíveis no painel do Simulation Lab"); break;
+      case "simple": openSimulation("simulation-simple", "Simple Macro selecionado"); break;
+      case "economy-zero": openSimulation("simulation-run", "Economy Zero selecionado"); break;
+      case "advanced": openSimulation("simulation-run", "Configuração Hybrid / Advanced aberta"); break;
+      case "batch": openSimulation("simulation-batch", "Experimentos em lote selecionados"); break;
+      case "shocks": case "presets": openSimulation("simulation-run", "Configuração de cenários aberta"); break;
+      case "simulation": case "results": openSimulation("simulation-run", "Simulation Lab selecionado"); break;
+      case "replay": openSimulation("simulation-replay", "Manifestos e reprodutibilidade selecionados"); break;
+      case "scenario-ai": setActiveModule("scenario-ai"); setActiveTool("scenario-compiler"); setStatus("Compilador de cenário selecionado"); break;
+      case "dynare": case "minsky": case "mesa": case "hark": setActiveModule(action); setStatus(`${action.toUpperCase()} Lab selecionado`); break;
+      case "validation": setActiveModule("validation"); setStatus("Diagnóstico de motores selecionado"); break;
+      case "data": case "calibration": setActiveModule("data-calibration"); setStatus("Dados e calibração selecionados"); break;
+      case "help": setStatus("Consulte README.md e a pasta docs incluídos no pacote completo"); break;
+      case "about": setStatus("Economy Lab 2.12.1 · laboratório econômico local e auditável"); break;
+      default: setStatus("Ação indisponível");
+    }
+  }
+
+  function onChromeExport() {
+    if (batchResult) { void onExportBatch("xlsx"); return; }
+    if (result) { void onExportSimulation("xlsx"); return; }
+    setStatus("Execute uma simulação antes de exportar; no Simple Macro use os botões do painel após o primeiro ano");
+  }
+
   async function refreshProfiles() {
     setProfiles(await listProfiles());
     setStorage(await getStorageStatus());
@@ -434,6 +466,9 @@ export default function App() {
       activeTool={activeTool}
       onModule={setActiveModule}
       onTool={(id, title) => { setActiveTool(id); setStatus(`${title} selecionada`); }}
+      onSave={() => { void onSaveProject(); }}
+      onExport={onChromeExport}
+      onAction={onChromeAction}
       onStatus={setStatus}
     >
       {activeModule === "simulation" ? (

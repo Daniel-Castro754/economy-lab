@@ -18,7 +18,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Economy Lab API",
-    version="2.11.0",
+    version="2.12.1",
     description="Local-first economic simulation kernel API",
     lifespan=lifespan,
 )
@@ -30,6 +30,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "tauri://localhost",
+        "http://tauri.localhost",
         "https://tauri.localhost",
     ],
     allow_credentials=False,

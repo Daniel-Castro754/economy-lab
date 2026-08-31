@@ -1,5 +1,13 @@
 # Economy Lab v2.12
 
+## v2.12.1 — Functional desktop connectivity audit
+
+- Corrige o CORS da origem `http://tauri.localhost`, permitindo que o aplicativo instalado consulte a API local.
+- Restaura os três cenários externos e a inicialização funcional do Simple Macro no executável.
+- Exibe falhas de carregamento do Simple Macro com ação de nova tentativa, sem esconder o erro.
+- Conecta Salvar, Exportar e os menus do shell desktop às ações e módulos reais.
+- Adiciona teste de regressão para a comunicação entre WebView e backend local.
+
 ## v2.12.0 — Dense desktop workspace redesign
 
 - Replaced the oversized hub header with a compact desktop topbar, menu bar and collapsible module sidebar.
