@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import type { HubModuleInfo, HubToolInfo } from "../api";
 
 type DesktopChromeProps = {
@@ -9,6 +9,7 @@ type DesktopChromeProps = {
   storageRuns: number;
   modules: HubModuleInfo[];
   activeModule: string;
+  simulationLevel: "simple" | "economy-zero" | "advanced";
   activeModuleInfo?: HubModuleInfo;
   tools: HubToolInfo[];
   activeTool: string;
@@ -16,6 +17,12 @@ type DesktopChromeProps = {
   onTool: (id: string, title: string) => void;
   onSave: () => void;
   onExport: () => void;
+  onRun: () => void;
+  running: boolean;
+  autoOpenResults: boolean;
+  simulationTimeout: number;
+  onAutoOpenResults: (value: boolean) => void;
+  onSimulationTimeout: (value: number) => void;
   onAction: (action: string) => void;
   onStatus: (message: string) => void;
 };
@@ -84,16 +91,25 @@ function moduleState(module: HubModuleInfo) {
 }
 
 export function DesktopChrome({
-  children, projectName, status, backendReady, storageRuns, modules, activeModule,
-  activeModuleInfo, tools, activeTool, onModule, onTool, onSave, onExport, onAction, onStatus,
+  children, projectName, status, backendReady, storageRuns, modules, activeModule, simulationLevel,
+  activeModuleInfo, tools, activeTool, onModule, onTool, onSave, onExport, onRun, running,
+  autoOpenResults, simulationTimeout, onAutoOpenResults, onSimulationTimeout, onAction, onStatus,
 }: DesktopChromeProps) {
   const [navOpen, setNavOpen] = useState(true);
   const [fileOpen, setFileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [density, setDensity] = useState(() => localStorage.getItem("economy-lab-density") ?? "compact");
   const simulation = modules.find(module => module.id === "simulation");
   const currentState = activeModuleInfo ? moduleState(activeModuleInfo) : null;
   const activeToolInfo = tools.find(tool => tool.id === activeTool);
   const pageTitle = activeModule === "simulation" && activeToolInfo ? activeToolInfo.title : (activeModuleInfo?.title ?? "Economy Lab");
   const pageDescription = activeModule === "simulation" && activeToolInfo ? activeToolInfo.description : (activeModuleInfo?.description ?? "Laboratório econômico local");
+
+  useEffect(() => {
+    document.documentElement.dataset.density = density;
+    localStorage.setItem("economy-lab-density", density);
+  }, [density]);
 
   const action = (id: string) => {
     if (id === "export") onExport(); else onAction(id);
@@ -102,7 +118,7 @@ export function DesktopChrome({
   return <main className="desktopApp">
     <header className="desktopTopbar">
       <div className="brandMark"><Icon name="flask" size={19} /></div>
-      <div className="brandName"><strong>Economy Lab</strong><span>v2.13.0</span></div>
+      <div className="brandName"><strong>Economy Lab</strong><span>v2.13.1</span></div>
       <div className="fileMenuRoot">
         <button type="button" className="topNavButton" onClick={() => setFileOpen(!fileOpen)}>Arquivo <Icon name="chevron" size={14} /></button>
         {fileOpen && <div className="fileMenu">
@@ -114,12 +130,46 @@ export function DesktopChrome({
       <span className="localBadge"><Icon name="database" size={13} /> SQLite local</span>
       <span className={backendReady ? "backendState ready" : "backendState missing"}><i /> {backendReady ? "Backend pronto" : "Backend indisponível"}</span>
       <span className="topSpacer" />
-      <button type="button" className="topAction run" onClick={() => onAction("simulation")}><Icon name="play" size={15} /> Executar</button>
+      <button type="button" className="topAction run" disabled={running} onClick={onRun}><Icon name={running ? "activity" : "play"} size={15} /> {running ? "Executando…" : "Executar"}</button>
       <button type="button" className="topAction" onClick={onSave}><Icon name="save" size={15} /> Salvar</button>
       <button type="button" className="iconAction" title="Exportar" aria-label="Exportar" onClick={onExport}><Icon name="download" size={17} /></button>
-      <button type="button" className="iconAction" title="Configurações" aria-label="Configurações" onClick={() => onStatus("Configurações do laboratório")}><Icon name="settings" size={17} /></button>
-      <button type="button" className="iconAction" title="Ajuda" aria-label="Ajuda" onClick={() => onStatus("Consulte README.md e a pasta docs incluídos no pacote completo")}><Icon name="help" size={17} /></button>
+      <button type="button" className="iconAction" title="Configurações" aria-label="Configurações" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={17} /></button>
+      <button type="button" className="iconAction" title="Ajuda" aria-label="Ajuda" onClick={() => setHelpOpen(true)}><Icon name="help" size={17} /></button>
     </header>
+
+    {settingsOpen && <div className="drawerBackdrop" role="presentation" onMouseDown={() => setSettingsOpen(false)}>
+      <aside className="appDrawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={event => event.stopPropagation()}>
+        <div className="drawerHeader"><div><span>ECONOMY LAB</span><strong id="settings-title">Configurações</strong></div><button type="button" className="drawerClose" aria-label="Fechar configurações" onClick={() => setSettingsOpen(false)}>×</button></div>
+        <div className="drawerBody">
+          <section className="settingsSection"><h3>Execução</h3>
+            <label className="settingsToggle"><span><strong>Abrir resultados ao concluir</strong><small>Leva o painel de resultados ao início após a simulação.</small></span><input type="checkbox" checked={autoOpenResults} onChange={event => { onAutoOpenResults(event.target.checked); localStorage.setItem("economy-lab-auto-results", String(event.target.checked)); }} /></label>
+            <label className="settingsField"><span>Tempo limite do Economy Zero</span><select value={simulationTimeout} onChange={event => { const value = Number(event.target.value); onSimulationTimeout(value); localStorage.setItem("economy-lab-timeout", String(value)); }}><option value={120}>2 minutos</option><option value={300}>5 minutos</option><option value={600}>10 minutos</option><option value={1200}>20 minutos</option></select></label>
+          </section>
+          <section className="settingsSection"><h3>Interface</h3>
+            <label className="settingsField"><span>Densidade dos painéis</span><select value={density} onChange={event => setDensity(event.target.value)}><option value="compact">Compacta</option><option value="comfortable">Confortável</option></select></label>
+          </section>
+          <section className="settingsSection"><h3>Ambiente local</h3>
+            <div className="settingsStatus"><span>Backend</span><strong className={backendReady ? "ok" : "bad"}>{backendReady ? "Pronto" : "Indisponível"}</strong></div>
+            <div className="settingsStatus"><span>Banco de dados</span><strong>SQLite local</strong></div>
+            <div className="settingsStatus"><span>Execuções registradas</span><strong>{storageRuns}</strong></div>
+            <p>Os motores externos continuam opcionais. O modo Basic usa apenas motores próprios e o Ledger/SFC permanece como autoridade contábil.</p>
+          </section>
+        </div>
+        <div className="drawerFooter"><button type="button" onClick={() => { setSettingsOpen(false); onStatus("Configurações salvas localmente"); }}>Concluir</button></div>
+      </aside>
+    </div>}
+
+    {helpOpen && <div className="drawerBackdrop" role="presentation" onMouseDown={() => setHelpOpen(false)}>
+      <aside className="appDrawer helpDrawer" role="dialog" aria-modal="true" aria-labelledby="help-title" onMouseDown={event => event.stopPropagation()}>
+        <div className="drawerHeader"><div><span>SUPORTE LOCAL</span><strong id="help-title">Ajuda rápida</strong></div><button type="button" className="drawerClose" aria-label="Fechar ajuda" onClick={() => setHelpOpen(false)}>×</button></div>
+        <div className="drawerBody">
+          <section className="settingsSection"><h3>Economy Zero</h3><p>Configure o cenário, clique em Executar e acompanhe percentual, mês atual e etapa. Você pode cancelar sem travar a interface.</p></section>
+          <section className="settingsSection"><h3>Motores externos</h3><p>Pontos vermelhos significam não instalado ou offline. Isso não bloqueia Simple Macro nem Economy Zero no perfil Basic.</p></section>
+          <section className="settingsSection"><h3>Resultados e histórico</h3><p>Salve um projeto antes de executar para registrar o resultado no histórico. Exportações ficam disponíveis depois de uma execução concluída.</p></section>
+          <section className="settingsSection"><h3>Diagnóstico</h3><p>Use Engine Diagnostics para verificar Dynare, Minsky, Mesa e HARK. Consulte também README.md e a pasta docs do pacote.</p></section>
+        </div>
+      </aside>
+    </div>}
 
     <div className="desktopBody">
       <aside className={navOpen ? "moduleSidebar" : "moduleSidebar collapsed"}>
@@ -129,7 +179,7 @@ export function DesktopChrome({
             {navOpen && <div className="sidebarGroupLabel">{group.label}</div>}
             {group.kind === "levels" && ["simple", "economy-zero", "advanced"].map((id, index) => {
               const labels = ["Simple Macro", "Economy Zero", "Hybrid/Advanced"];
-              const active = activeModule === "simulation" && (id === "simple" ? activeTool === "simulation-simple" : id === "economy-zero" ? activeTool === "simulation-run" : false);
+              const active = activeModule === "simulation" && simulationLevel === id;
               const simState = simulation ? moduleState(simulation) : { className: "offline", label: "Offline" };
               return <button type="button" key={id} className={active ? "sidebarModule active" : "sidebarModule"} onClick={() => onAction(id)} title={!navOpen ? labels[index] : undefined}>
                 <span className="moduleIcon"><Icon name={index === 0 ? "activity" : index === 1 ? "flask" : "cpu"} size={17} /></span>
@@ -166,7 +216,7 @@ export function DesktopChrome({
           {tools.map(tool => <button type="button" key={tool.id} className={activeTool === tool.id ? "workspaceTool active" : "workspaceTool"} onClick={() => onTool(tool.id, tool.title)} title={tool.description}>{tool.title}</button>)}
         </nav>}
         <div className="desktopContent">{children}</div>
-        <footer className="desktopStatusbar"><Icon name={backendReady ? "check" : "activity"} size={14} /><span>{status}</span><span className="topSpacer" /><span>Local-first</span><span>v2.13.0</span></footer>
+        <footer className="desktopStatusbar"><Icon name={backendReady ? "check" : "activity"} size={14} /><span>{status}</span><span className="topSpacer" /><span>Local-first</span><span>v2.13.1</span></footer>
       </section>
     </div>
   </main>;

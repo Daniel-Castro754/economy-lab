@@ -682,7 +682,7 @@ def validate_external_engines(
     integration_tests: bool = True,
     dynare_timeout_seconds: int = 60,
     minsky_timeout_seconds: float = 3.0,
-    economy_lab_version: str = "2.13.0",
+    economy_lab_version: str = "2.13.1",
 ) -> ExternalValidationReport:
     requested: list[EngineName] = []
     for engine in engines:

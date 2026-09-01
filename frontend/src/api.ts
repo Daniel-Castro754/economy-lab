@@ -446,6 +446,62 @@ export async function simulate(spec: ScenarioSpec): Promise<SimulationResult> {
   return response.json();
 }
 
+export type SimulationJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export type SimulationJobRecord = {
+  id: string;
+  project_id?: string | null;
+  kind: "simulation";
+  status: SimulationJobStatus;
+  run_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  progress: number;
+  current_step: number;
+  total_steps: number;
+  stage: string;
+  timeout_seconds: number;
+  cancellation_requested: boolean;
+  error_code?: string | null;
+  error_message?: string | null;
+  scenario: ScenarioSpec;
+  result?: SimulationResult | null;
+  save_scenario: boolean;
+};
+
+export async function createSimulationJob(
+  scenario: ScenarioSpec,
+  projectId: string | null,
+  timeoutSeconds = 300,
+): Promise<SimulationJobRecord> {
+  const response = await apiFetch("/jobs/simulations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scenario,
+      project_id: projectId,
+      save_scenario: true,
+      timeout_seconds: timeoutSeconds,
+    }),
+  });
+  if (!response.ok) throw new Error(`Fila de simulação falhou: ${response.status} — ${await response.text()}`);
+  return response.json();
+}
+
+export async function getSimulationJob(jobId: string): Promise<SimulationJobRecord> {
+  const response = await apiFetch(`/jobs/${jobId}`);
+  if (!response.ok) throw new Error(`Consulta da simulação falhou: ${response.status} — ${await response.text()}`);
+  return response.json();
+}
+
+export async function cancelSimulationJob(jobId: string): Promise<SimulationJobRecord> {
+  const response = await apiFetch(`/jobs/${jobId}/cancel`, { method: "POST" });
+  if (!response.ok) throw new Error(`Cancelamento falhou: ${response.status} — ${await response.text()}`);
+  return response.json();
+}
+
 
 export type SimpleScenarioId = "baseline" | "global_recession" | "volatile";
 export type SimpleExternalYear = { year: number; world_growth: number; consumer_confidence: number; label: string };

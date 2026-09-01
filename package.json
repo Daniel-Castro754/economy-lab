@@ -1,7 +1,7 @@
 {
   "name": "economy-lab",
   "private": true,
-  "version": "2.13.0",
+  "version": "2.13.1",
   "scripts": {
     "web": "npm --prefix frontend run dev",
     "web:build": "npm --prefix frontend run build",

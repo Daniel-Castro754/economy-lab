@@ -202,7 +202,7 @@ def simulation_xlsx_bytes(scenario: ScenarioSpec, result: SimulationResult) -> b
     summary = result.summary.model_dump(mode="python")
     scenario_values = scenario.model_dump(mode="python")
     sheets: list[tuple[str, list[list[Any]]]] = [
-        ("Resumo", [["Economy Lab v2.13.0", result.scenario], ["Modelo", result.model], ["Aviso", result.warning], []] + _kv_rows(summary, "Indicador")),
+        ("Resumo", [["Economy Lab v2.13.1", result.scenario], ["Modelo", result.model], ["Aviso", result.warning], []] + _kv_rows(summary, "Indicador")),
         ("Cenário", _kv_rows(scenario_values, "Parâmetro")),
         ("Série mensal", _dict_rows([point.model_dump(mode="python") for point in result.series])),
     ]
@@ -272,7 +272,7 @@ def simulation_xlsx_bytes(scenario: ScenarioSpec, result: SimulationResult) -> b
 
 def batch_xlsx_bytes(result: BatchExperimentResponse) -> bytes:
     sheets: list[tuple[str, list[list[Any]]]] = [
-        ("Resumo", [["Economy Lab v2.13.0", "Experimento em lote"], ["Eixo", result.axis], ["Repetições", result.repetitions], ["Execuções", result.total_runs], ["Analytics", result.analytics_engine], ["Aviso", result.warning]]),
+        ("Resumo", [["Economy Lab v2.13.1", "Experimento em lote"], ["Eixo", result.axis], ["Repetições", result.repetitions], ["Execuções", result.total_runs], ["Analytics", result.analytics_engine], ["Aviso", result.warning]]),
         ("Comparação", _dict_rows([item.model_dump(mode="python") for item in result.aggregates])),
         ("Execuções", _dict_rows([item.model_dump(mode="python") for item in result.runs])),
         ("Cenário base", _kv_rows(result.base_scenario.model_dump(mode="python"), "Parâmetro")),
@@ -296,7 +296,7 @@ def calibration_xlsx_bytes(scenario, calibration, fit=None) -> bytes:
             })
     sheets: list[tuple[str, list[list[Any]]]] = [
         ("Resumo calibração", [
-            ["Economy Lab v2.13.0", "Calibration/Data Layer"],
+            ["Economy Lab v2.13.1", "Calibration/Data Layer"],
             ["Score", calibration.score],
             ["Normalized RMSE", calibration.normalized_rmse],
             ["Revisão obrigatória", calibration.requires_review],
@@ -379,7 +379,7 @@ def simple_xlsx_bytes(result: SimpleRunResult) -> bytes:
             "year": item.year, "explanation": " | ".join(item.explanation), "warnings": " | ".join(item.warnings)
         })
     sheets = [
-        ("Resumo", [["Economy Lab v2.13.0", "Simple Macro"], ["Cenário", result.config.scenario_id], ["Anos executados", result.completed_years], ["Aviso", result.warning], [],
+        ("Resumo", [["Economy Lab v2.13.1", "Simple Macro"], ["Cenário", result.config.scenario_id], ["Anos executados", result.completed_years], ["Aviso", result.warning], [],
                     ["Indicador final", "Valor"], ["PIB índice", result.final_state.gdp_index], ["Crescimento PIB", result.final_state.real_gdp_growth],
                     ["Inflação", result.final_state.inflation], ["Desemprego", result.final_state.unemployment],
                     ["Déficit/PIB", result.final_state.budget_deficit_to_gdp], ["Dívida/PIB", result.final_state.debt_to_gdp], ["Aprovação", result.final_state.approval]]),
