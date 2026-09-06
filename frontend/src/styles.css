@@ -986,3 +986,14 @@ html[data-density="comfortable"] .workspaceTool { height: 39px; min-height: 39px
 @media (max-width: 1050px) {
   .economyZeroGrid { grid-template-columns: 330px minmax(0,1fr) !important; }
 }
+
+/* Managed engine installation and diagnostics. */
+.engineSettings .runtimePath { overflow-wrap: anywhere; font-family: Consolas, monospace; font-size: 11px; }
+.engineSettings progress { width: 100%; accent-color: var(--accent, #4299dd); }
+.engineSettings .runtimeLog { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; padding: 10px; background: #161b22; font: 11px/1.5 Consolas, monospace; }
+.engineSettings button { margin-bottom: 8px; }
+.engineSettings h4 { margin: 20px 0 8px; }
+.engineSettings .settingsField input { min-width: 0; width: 100%; }
+.engineRequirement { padding: 12px; border: 1px solid #8b703b; border-radius: 5px; background: #332e23; }
+.engineRequirement p { margin: 5px 0 10px; }
+.engineRequirement button { margin: 0 8px 4px 0; }

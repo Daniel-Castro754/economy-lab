@@ -1,3 +1,4 @@
+import { EngineSettings } from "./EngineSettings";
 import { ReactNode, useEffect, useState } from "react";
 import type { HubModuleInfo, HubToolInfo } from "../api";
 
@@ -111,6 +112,12 @@ export function DesktopChrome({
     localStorage.setItem("economy-lab-density", density);
   }, [density]);
 
+  useEffect(() => {
+    const open = () => setSettingsOpen(true);
+    window.addEventListener("economy-lab-open-engines", open);
+    return () => window.removeEventListener("economy-lab-open-engines", open);
+  }, []);
+
   const action = (id: string) => {
     if (id === "export") onExport(); else onAction(id);
   };
@@ -118,7 +125,7 @@ export function DesktopChrome({
   return <main className="desktopApp">
     <header className="desktopTopbar">
       <div className="brandMark"><Icon name="flask" size={19} /></div>
-      <div className="brandName"><strong>Economy Lab</strong><span>v2.13.2</span></div>
+      <div className="brandName"><strong>Economy Lab</strong><span>v2.14.0</span></div>
       <div className="fileMenuRoot">
         <button type="button" className="topNavButton" onClick={() => setFileOpen(!fileOpen)}>Arquivo <Icon name="chevron" size={14} /></button>
         {fileOpen && <div className="fileMenu">
@@ -141,6 +148,7 @@ export function DesktopChrome({
       <aside className="appDrawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={event => event.stopPropagation()}>
         <div className="drawerHeader"><div><span>ECONOMY LAB</span><strong id="settings-title">Configurações</strong></div><button type="button" className="drawerClose" aria-label="Fechar configurações" onClick={() => setSettingsOpen(false)}>×</button></div>
         <div className="drawerBody">
+          <EngineSettings />
           <section className="settingsSection"><h3>Execução</h3>
             <label className="settingsToggle"><span><strong>Abrir resultados ao concluir</strong><small>Leva o painel de resultados ao início após a simulação.</small></span><input type="checkbox" checked={autoOpenResults} onChange={event => { onAutoOpenResults(event.target.checked); localStorage.setItem("economy-lab-auto-results", String(event.target.checked)); }} /></label>
             <label className="settingsField"><span>Tempo limite do Economy Zero</span><select value={simulationTimeout} onChange={event => { const value = Number(event.target.value); onSimulationTimeout(value); localStorage.setItem("economy-lab-timeout", String(value)); }}><option value={120}>2 minutos</option><option value={300}>5 minutos</option><option value={600}>10 minutos</option><option value={1200}>20 minutos</option></select></label>
@@ -216,7 +224,7 @@ export function DesktopChrome({
           {tools.map(tool => <button type="button" key={tool.id} className={activeTool === tool.id ? "workspaceTool active" : "workspaceTool"} onClick={() => onTool(tool.id, tool.title)} title={tool.description}>{tool.title}</button>)}
         </nav>}
         <div className="desktopContent">{children}</div>
-        <footer className="desktopStatusbar"><Icon name={backendReady ? "check" : "activity"} size={14} /><span>{status}</span><span className="topSpacer" /><span>Local-first</span><span>v2.13.2</span></footer>
+        <footer className="desktopStatusbar"><Icon name={backendReady ? "check" : "activity"} size={14} /><span>{status}</span><span className="topSpacer" /><span>Local-first</span><span>v2.14.0</span></footer>
       </section>
     </div>
   </main>;

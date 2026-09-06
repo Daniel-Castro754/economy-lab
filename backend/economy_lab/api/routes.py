@@ -99,7 +99,10 @@ from economy_lab.api.model_routes import router as model_router
 
 logger = logging.getLogger(__name__)
 
+from economy_lab.api.runtime_routes import router as runtime_router
+
 router = APIRouter()
+router.include_router(runtime_router)
 router.include_router(simple_router)
 router.include_router(catalog_router)
 router.include_router(profile_router)

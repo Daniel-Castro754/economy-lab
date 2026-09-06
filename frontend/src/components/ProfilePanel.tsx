@@ -2,6 +2,7 @@ import type { ProfileSummary, SimulationPresetInfo } from "../api";
 
 export type ProfilePanelProps = {
   presets: SimulationPresetInfo[];
+  availableEngines: Record<string, boolean>;
   profiles: ProfileSummary[];
   appliedProfiles: Record<string, string>;
   onApplyPreset: (presetId: string) => void;
@@ -10,7 +11,7 @@ export type ProfilePanelProps = {
 };
 
 export function ProfilePanel({
-  presets, profiles, appliedProfiles,
+  presets, profiles, appliedProfiles, availableEngines,
   onApplyPreset, onApplyProfile, onDeleteProfile,
 }: ProfilePanelProps) {
   return (
@@ -21,11 +22,12 @@ export function ProfilePanel({
       </div>
       <div className="presetGrid">
         {presets.map((preset) => (
-          <button type="button" className="secondaryButton" key={preset.id} onClick={() => onApplyPreset(preset.id)} title={preset.description}>
+          <button type="button" className="secondaryButton" key={preset.id} onClick={() => onApplyPreset(preset.id)} disabled={preset.requirements.some(engine => !availableEngines[engine])} title={preset.requirements.some(engine => !availableEngines[engine]) ? `${preset.description} — Requer: ${preset.requirements.filter(engine => !availableEngines[engine]).join(", ")}. Abra Configurações → Motores.` : preset.description}>
             {preset.title}
           </button>
         ))}
       </div>
+      <button type="button" className="secondaryButton" onClick={() => window.dispatchEvent(new Event("economy-lab-open-engines"))}>Instalar / configurar motores</button>
       {Object.keys(appliedProfiles ?? {}).length > 0 && (
         <div className="profileChips">
           {Object.entries(appliedProfiles).map(([kind, id]) => { const p = profiles.find(item => item.id === id); return <span key={kind}>{kind}: {p?.name ?? id.slice(0, 8)}</span>; })}

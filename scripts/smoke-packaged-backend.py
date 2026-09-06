@@ -43,7 +43,7 @@ def main():
                     if process.poll() is not None or time.monotonic() >= deadline:
                         raise RuntimeError('Packaged backend did not become ready')
                     time.sleep(.25)
-            assert health['engine_version'] == '2.13.2', health
+            assert health['engine_version'] == '2.14.0', health
             response, scenarios = api('/simple/scenarios')
             assert len(scenarios) == 3
             assert response.headers.get('Access-Control-Allow-Origin') == 'http://tauri.localhost'

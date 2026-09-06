@@ -210,7 +210,7 @@ class HarkConsumptionPolicy:
         if not hark_available():
             raise EngineUnavailableError(
                 "HARK foi solicitado, mas o pacote econ-ark/HARK não está instalado. "
-                'Instale as dependências de simulação com: pip install -e ".[simulation]"'
+                'Abra Configurações → Motores e instale Mesa e HARK; depois reabra o aplicativo.'
             )
 
     def _discount_factor(self, patience_bucket: int) -> float:

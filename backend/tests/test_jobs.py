@@ -97,7 +97,7 @@ def test_manager_completes_project_job_and_saves_run(tmp_path):
     assert completed["status"] == "completed"
     assert completed["run_id"] is not None
     run = store.get_run(completed["run_id"])
-    assert run["engine_version"] == "2.13.2"
+    assert run["engine_version"] == "2.14.0"
     assert run["manifest"]["seed"] == spec.seed
     assert run["manifest_hash"] is not None
 

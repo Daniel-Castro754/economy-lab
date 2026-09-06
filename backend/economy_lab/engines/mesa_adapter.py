@@ -58,7 +58,7 @@ def _build_mesa_runtime(domain: "EconomyZeroModel") -> ActivationRuntime:
     if not mesa_available():
         raise EngineUnavailableError(
             "Mesa foi solicitado, mas não está instalado. "
-            'Instale as dependências de simulação com: pip install -e ".[simulation]"'
+            'Abra Configurações → Motores e instale Mesa e HARK; depois reabra o aplicativo.'
         )
 
     import mesa

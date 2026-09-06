@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "economy-lab"
-version = "2.13.2"
+version = "2.14.0"
 description = "Local-first hybrid economic simulation engine"
 requires-python = ">=3.12"
 dependencies = [

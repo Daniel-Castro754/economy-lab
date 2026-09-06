@@ -275,7 +275,14 @@ export default function App() {
 
   const jobIsActive = simulationJob?.status === "queued" || simulationJob?.status === "running";
 
+  const availableEngines: Record<string, boolean> = { mesa: !!health?.mesa_available, hark: !!health?.hark_available, dynare: !!health?.dynare_ready };
+  const missingEngines = health ? [spec.activation_engine === "mesa" && !health.mesa_available ? "Mesa" : "", spec.household_behavior === "hark" && !health.hark_available ? "HARK" : "", spec.macro_engine === "dynare" && !health.dynare_ready ? "Dynare" : ""].filter(Boolean) : [];
+
   async function runEconomyZero() {
+    if (!jobIsActive && missingEngines.length) {
+      const message = `O cenário solicita ${missingEngines.join(", ")}, indisponível neste ambiente. Abra Configurações → Motores ou aplique Basic para usar os motores nativos.`;
+      setSimulationError(message); setStatus(message); return;
+    }
     if (simulationLockRef.current) return;
     simulationLockRef.current = true;
     setMonitoringJob(true);
@@ -388,7 +395,7 @@ export default function App() {
       case "validation": setActiveModule("validation"); setStatus("Diagnóstico de motores selecionado"); break;
       case "data": case "calibration": setActiveModule("data-calibration"); setStatus("Dados e calibração selecionados"); break;
       case "help": setStatus("Consulte README.md e a pasta docs incluídos no pacote completo"); break;
-      case "about": setStatus("Economy Lab 2.13.2 · laboratório econômico local e auditável"); break;
+      case "about": setStatus("Economy Lab 2.14.0 · laboratório econômico local e auditável"); break;
       default: setStatus("Ação indisponível");
     }
   }
@@ -548,8 +555,10 @@ export default function App() {
             formatDate={when}
           />
 
+          {missingEngines.length > 0 && <div className="engineRequirement" role="alert"><strong>Motores necessários: {missingEngines.join(", ")}</strong><p>O cenário mantém suas escolhas, mas esses motores ainda não estão disponíveis.</p><button type="button" onClick={() => window.dispatchEvent(new Event("economy-lab-open-engines"))}>Instalar / configurar motores</button><button type="button" className="secondaryButton" onClick={() => { void onApplyPreset("basic"); setSimulationError(""); }}>Aplicar Basic (motores nativos)</button></div>}
           <ProfilePanel
             presets={presets}
+            availableEngines={availableEngines}
             profiles={profiles}
             appliedProfiles={spec.applied_profiles}
             onApplyPreset={onApplyPreset}

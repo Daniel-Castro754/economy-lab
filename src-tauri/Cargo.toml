@@ -1,6 +1,6 @@
 [package]
 name = "economy-lab-desktop"
-version = "2.13.2"
+version = "2.14.0"
 description = "Economy Lab desktop shell"
 authors = ["Economy Lab contributors"]
 edition = "2021"
