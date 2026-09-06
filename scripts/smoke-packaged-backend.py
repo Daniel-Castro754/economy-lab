@@ -1,4 +1,5 @@
 """Check the real frozen backend with isolated data before accepting an installer."""
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -46,9 +47,12 @@ def main():
             response, scenarios = api('/simple/scenarios')
             assert len(scenarios) == 3
             assert response.headers.get('Access-Control-Allow-Origin') == 'http://tauri.localhost'
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                statuses = list(pool.map(lambda _: api('/storage/status')[1], range(8)))
+            assert all(status['schema_version'] == 5 for status in statuses)
             scenario = {'name': 'Packaged smoke', 'months': 12, 'households': 300, 'firms': 15, 'banks': 3, 'seed': 42}
             _, project = api('/projects', {'name': 'Packaged smoke', 'scenario': scenario})
-            _, job = api('/jobs', {'scenario': scenario, 'project_id': project['id'], 'timeout_seconds': 120})
+            _, job = api('/jobs/simulations', {'scenario': scenario, 'project_id': project['id'], 'timeout_seconds': 120})
             deadline = time.monotonic() + 130
             while job['status'] in ('queued', 'running'):
                 if time.monotonic() >= deadline:

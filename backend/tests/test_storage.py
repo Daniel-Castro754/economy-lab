@@ -243,3 +243,45 @@ def test_integrity_check_detects_corruption(tmp_path):
 
     with pytest.raises(RuntimeError, match="integrity check failed"):
         ProjectStore(path)
+
+
+def test_simultaneous_first_open_is_atomic(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    path = tmp_path / "simultaneous.sqlite3"
+    barrier = Barrier(8)
+
+    def open_at_once(_):
+        barrier.wait(timeout=10)
+        store = ProjectStore(path)
+        return store.status()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(open_at_once, range(8)))
+    assert all(status["schema_version"] == 5 for status in statuses)
+    assert all(status["projects"] == 0 for status in statuses)
+
+
+def test_migration_failure_rolls_back_all_ddl(tmp_path, monkeypatch):
+    import sqlite3
+    import economy_lab.storage.schema as schema
+    path = tmp_path / "atomic.sqlite3"
+    original = schema._execute_migration
+    calls = 0
+
+    def fail_mid_migration(db, script):
+        nonlocal calls
+        calls += 1
+        original(db, script)
+        if calls == 3:
+            raise RuntimeError("Interrupted migration")
+
+    monkeypatch.setattr(schema, "_execute_migration", fail_mid_migration)
+    import pytest
+    with pytest.raises(RuntimeError, match="Interrupted migration"):
+        ProjectStore(path)
+    with sqlite3.connect(path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 0
+    monkeypatch.setattr(schema, "_execute_migration", original)
+    assert ProjectStore(path).status()["schema_version"] == 5

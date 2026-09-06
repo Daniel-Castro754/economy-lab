@@ -5,8 +5,18 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
+from threading import RLock
 
 SCHEMA_VERSION = 5
+_INITIALIZATION_LOCK = RLock()
+
+
+def _execute_migration(db: sqlite3.Connection, script: str) -> None:
+    # Fixed DDL statements have no embedded semicolons. execute() preserves
+    # the transaction; executescript() would commit it before each stage.
+    for statement in script.split(";"):
+        if statement.strip():
+            db.execute(statement)
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -60,6 +70,12 @@ def _backup_before_migration(path: Path, from_version: int, to_version: int) -> 
 
 
 def initialize_database(path: Path) -> None:
+    # Startup endpoints can initialize the same file from several threads.
+    with _INITIALIZATION_LOCK:
+        _initialize_database_locked(path)
+
+
+def _initialize_database_locked(path: Path) -> None:
     pre_conn = sqlite3.connect(path, timeout=10.0)
     try:
         version = int(pre_conn.execute("PRAGMA user_version").fetchone()[0])
@@ -75,9 +91,11 @@ def initialize_database(path: Path) -> None:
         _backup_before_migration(path, version, SCHEMA_VERSION)
 
     with _session(path) as db:
+        # Serialize migrations across separate application processes too.
+        db.execute("BEGIN IMMEDIATE")
         version = int(db.execute("PRAGMA user_version").fetchone()[0])
         if version == 0:
-            db.executescript(
+            _execute_migration(db,
                 """
                 CREATE TABLE IF NOT EXISTS projects (
                     id TEXT PRIMARY KEY,
@@ -114,7 +132,7 @@ def initialize_database(path: Path) -> None:
             db.execute("PRAGMA user_version = 1")
 
         if version < 2:
-            db.executescript(
+            _execute_migration(db,
                 """
                 CREATE TABLE IF NOT EXISTS experiments (
                     id TEXT PRIMARY KEY,
@@ -138,7 +156,7 @@ def initialize_database(path: Path) -> None:
             db.execute("PRAGMA user_version = 2")
 
         if version < 3:
-            db.executescript(
+            _execute_migration(db,
                 """
                 CREATE TABLE IF NOT EXISTS profiles (
                     id TEXT PRIMARY KEY,
@@ -163,7 +181,7 @@ def initialize_database(path: Path) -> None:
             db.execute("PRAGMA user_version = 3")
 
         if version < 4:
-            db.executescript(
+            _execute_migration(db,
                 """
                 CREATE TABLE IF NOT EXISTS jobs (
                     id TEXT PRIMARY KEY,
@@ -201,7 +219,7 @@ def initialize_database(path: Path) -> None:
             db.execute("PRAGMA user_version = 4")
 
         if version < 5:
-            db.executescript(
+            _execute_migration(db,
                 """
                 ALTER TABLE runs ADD COLUMN manifest_json TEXT NULL;
                 ALTER TABLE runs ADD COLUMN manifest_hash TEXT NULL;

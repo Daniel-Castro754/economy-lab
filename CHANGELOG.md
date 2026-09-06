@@ -3,6 +3,7 @@
 - APIs e armazenamento modularizados; painéis de projetos e Profiles extraídos.
 - Validação de entradas, backup de migração SQLite e rastreabilidade das séries preservados.
 - Exportação usa o cenário da execução; Simple Macro impede operações simultâneas.
+- Inicialização e migrações SQLite atômicas, incluindo chamadas simultâneas na primeira abertura.
 - Reconexão consulta o mesmo job após falha de progresso, sem reenviar a simulação.
 - Falha ao atualizar o histórico não transforma uma execução concluída em erro.
 - Números inválidos retornam HTTP 422; falhas de integridade SQLite têm erro legível.
