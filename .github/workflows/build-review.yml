@@ -19,6 +19,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
       - name: Backend tests
         shell: pwsh
         run: |
@@ -51,6 +52,7 @@ jobs:
             managed-installation.log
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: runtime-v2.14.0-installer
           path: |

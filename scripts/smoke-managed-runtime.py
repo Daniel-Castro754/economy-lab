@@ -16,7 +16,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='Economy Lab installed test ') as temporary:
         root = Path(temporary)
         installed = root / 'Application'
-        subprocess.run([str(installer), '/S', '/D=' + str(installed)], check=True, timeout=180)
+        # NSIS requires /D as the final argument, without quotes even for spaces.
+        subprocess.run(subprocess.list2cmdline([str(installer)]) + ' /S /D=' + str(installed), check=True, timeout=180)
         executable = installed / 'economy-lab-backend.exe'
         resources = installed / 'runtime-tools'
         assert executable.is_file(), list(installed.iterdir())
