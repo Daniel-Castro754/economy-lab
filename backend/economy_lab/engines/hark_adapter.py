@@ -262,7 +262,10 @@ class HarkConsumptionPolicy:
             BoroCnstArt=0.0,
             CubicBool=False,
             vFuncBool=False,
-            quiet=True,
+            # HARK 0.17.2 skips required condition initialization with quiet=True.
+            # Keep the preparation enabled and suppress logging with verbose instead.
+            quiet=False,
+            verbose=False,
             seed=group_bucket * 10 + patience_bucket,
         )
         consumer.solve()

@@ -1,12 +1,14 @@
 # Economy Lab
 
-## Current version: v2.13.2 — reviewed refactor and resilient job monitoring
+## Current version: v2.14.0 — instalação integrada de motores opcionais
 
 Economy Lab is a local-first economic simulation hub with Simple Macro, Economy Zero and Hybrid simulation levels plus independent Dynare/Minsky/Mesa/HARK labs, profiles, real-data/calibration tooling and safe ModelSpec support.
 
+Para instalar Mesa e HARK pelo aplicativo, consulte [Configurações → Motores](docs/MOTORES-INSTALACAO-v2.14.0.md). O instalador base funciona com motores nativos; instalar pacotes no Python do Windows não altera o backend incorporado.
+
 ### Backend Completion phase
 
-v2.13.2 is the current source version and controlled milestone on the path to **v3.0 Backend Freeze**. The v2.11 reproducibility contract remains part of that baseline; visual redesign and new economic domains remain frozen.
+v2.14.0 is the current source version and controlled milestone on the path to **v3.0 Backend Freeze**. The v2.11 reproducibility contract remains part of that baseline; visual redesign and new economic domains remain frozen.
 
 v2.13.1 makes the persistent Economy Zero job flow observable in the desktop UI, with progress, cancellation, timeout handling, result/failure display and retry controls. It preserves the v2.11 manifest and replay guarantees below.
 
@@ -59,6 +61,6 @@ economy_lab.main:app --reload`, then `npm install && npm run dev` in
 
 ### Windows desktop installer
 
-A local installer, `Economy Lab_2.13.2_x64-setup.exe`, is present in this working tree. It is **not signed** and must not be treated as a trusted release artifact.
+A local installer, `Economy Lab_2.14.0_x64-setup.exe`, is present in this working tree. It is **not signed** and must not be treated as a trusted release artifact.
 
-No GitHub Actions installer workflow is included in this repository. Build output produced locally is a local artifact, not a published or verified release. On Windows, run `npm run verify` before `npm run desktop:build`; the latter uses the committed npm lockfiles and does not download a Tauri CLI ad hoc. These commands require the Python, Node.js and Rust/MSVC toolchain (`npm run desktop:check`). The resulting installer bundles the Python backend as a PyInstaller sidecar, so the target machine needs no Python, Node or Rust. See `docs/DESKTOP_RUNTIME.md` for the sidecar and shutdown handshake.
+The installer is built and tested on a separate Windows build branch. See docs/MOTORES-INSTALACAO-v2.14.0.md for installation instructions and docs/validacao/v2.14.0/ for validation evidence. On Windows, run `npm run verify` before `npm run desktop:build`; the latter uses the committed npm lockfiles and does not download a Tauri CLI ad hoc. These commands require the Python, Node.js and Rust/MSVC toolchain (`npm run desktop:check`). The resulting installer bundles the Python backend as a PyInstaller sidecar, so the target machine needs no Python, Node or Rust. See `docs/DESKTOP_RUNTIME.md` for the sidecar and shutdown handshake.
