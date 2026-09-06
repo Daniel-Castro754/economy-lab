@@ -1,8 +1,33 @@
 from __future__ import annotations
 
-from economy_lab.core.schemas import ScenarioSpec
+import pytest
+from pydantic import ValidationError
+
+from economy_lab.core.schemas import (
+    DataFetchRequest,
+    LabProfileCreateRequest,
+    ProjectCreateRequest,
+    ProjectUpdateRequest,
+    ScenarioSpec,
+)
 from economy_lab.profiles import apply_preset, apply_profile_to_scenario, build_lab_profile, list_simulation_presets
+from economy_lab.storage.profiles import ProfileStoreMixin
 from economy_lab.storage.sqlite_store import ProjectStore
+
+
+def test_required_text_fields_are_trimmed_and_reject_whitespace():
+    assert ScenarioSpec(name="  Cenário  ").name == "Cenário"
+    assert ProjectCreateRequest(name="  Projeto  ", scenario=ScenarioSpec()).name == "Projeto"
+    assert DataFetchRequest(source="bcb_sgs", series_id="  432  ").series_id == "432"
+
+    with pytest.raises(ValidationError):
+        ScenarioSpec(name="   ")
+    with pytest.raises(ValidationError):
+        ProjectCreateRequest(name="   ", scenario=ScenarioSpec())
+    with pytest.raises(ValidationError):
+        ProjectUpdateRequest(name="   ")
+    with pytest.raises(ValidationError):
+        LabProfileCreateRequest(module_id="mesa", name="   ")
 
 
 def test_dynare_profile_maps_structural_parameters_into_simulation():
@@ -79,3 +104,12 @@ def test_profile_store_roundtrip_and_schema_v5(tmp_path):
     assert store.list_profiles(module_id="dynare")[0]["name"] == "Macro teste"
     assert store.delete_profile(item["id"]) is True
     assert store.status()["profiles"] == 0
+
+
+def test_project_store_composes_profile_mixin():
+    assert issubclass(ProjectStore, ProfileStoreMixin)
+    assert ProjectStore.create_profile is ProfileStoreMixin.create_profile
+    assert ProjectStore.list_profiles is ProfileStoreMixin.list_profiles
+    assert ProjectStore.get_profile is ProfileStoreMixin.get_profile
+    assert ProjectStore.delete_profile is ProfileStoreMixin.delete_profile
+    assert ProjectStore._profile_row is ProfileStoreMixin._profile_row

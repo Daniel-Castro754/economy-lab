@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from economy_lab.core.schemas import ScenarioSpec
 from economy_lab.core.simulation import run_simulation
-from economy_lab.storage.sqlite_store import ProjectStore
+from economy_lab.storage import schema
+from economy_lab.storage.projects import ProjectRecordStoreMixin
+from economy_lab.storage.runs import RunStoreMixin
+from economy_lab.storage.sqlite_store import SCHEMA_VERSION, ProjectStore
 
 
 def test_project_crud_and_immutable_run_history(tmp_path):
@@ -126,3 +129,117 @@ def test_schema_v1_migrates_to_v5_without_dropping_projects(tmp_path):
     assert store.status()["experiments"] == 0
     assert store.status()["profiles"] == 0
     assert store.status()["jobs"] == 0
+
+
+def test_migration_backup_created_for_legacy_db(tmp_path):
+    import sqlite3
+    path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(path) as db:
+        db.executescript("""
+            CREATE TABLE projects (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+                scenario_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                last_run_id TEXT NULL
+            );
+            CREATE TABLE runs (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL, scenario_json TEXT NOT NULL,
+                result_json TEXT NOT NULL, created_at TEXT NOT NULL, duration_ms REAL NOT NULL DEFAULT 0,
+                engine_version TEXT NOT NULL, final_gdp_index REAL NOT NULL, final_inflation REAL NOT NULL,
+                final_unemployment REAL NOT NULL, ledger_balanced INTEGER NOT NULL,
+                godley_stocks_balanced INTEGER NOT NULL, godley_flows_balanced INTEGER NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+        """)
+        db.execute("PRAGMA user_version = 1")
+
+    store = ProjectStore(path)
+
+    backups = list(tmp_path.glob("legacy.v1_to_v5.*.backup.sqlite3"))
+    assert len(backups) == 1, f"Expected exactly one backup, found: {backups}"
+    backup_path = backups[0]
+
+    with sqlite3.connect(backup_path) as backup_db:
+        v = int(backup_db.execute("PRAGMA user_version").fetchone()[0])
+        assert v == 1, f"Backup should preserve original version 1, got {v}"
+
+    assert store.status()["schema_version"] == 5
+
+    no_tmp = list(tmp_path.glob("*.tmp"))
+    assert no_tmp == [], f"Temp file should not remain: {no_tmp}"
+
+
+def test_no_backup_for_new_db(tmp_path):
+    path = tmp_path / "brand-new.sqlite3"
+    ProjectStore(path)
+    backups = list(tmp_path.glob("*.backup.*"))
+    assert backups == [], f"New database must not produce backup files: {backups}"
+
+
+def test_no_backup_for_current_version_db(tmp_path):
+    path = tmp_path / "current.sqlite3"
+    ProjectStore(path)
+    existing = list(tmp_path.glob("*.backup.*"))
+    assert existing == [], "First open must not produce backups"
+
+    ProjectStore(path)
+    after = list(tmp_path.glob("*.backup.*"))
+    assert after == [], f"Re-open at same version must not produce backups: {after}"
+
+
+def test_schema_version_reexported_from_sqlite_store():
+    assert SCHEMA_VERSION == schema.SCHEMA_VERSION == 5
+
+
+def test_initialize_database_is_callable_directly(tmp_path):
+    path = tmp_path / "direct-init.sqlite3"
+    schema.initialize_database(path)
+    store = ProjectStore(path)
+    assert store.status()["schema_version"] == 5
+
+
+def test_project_store_composes_persistence_mixins():
+    assert issubclass(ProjectStore, ProjectRecordStoreMixin)
+    assert issubclass(ProjectStore, RunStoreMixin)
+
+
+def test_project_and_run_mixin_methods_are_bound_on_store(tmp_path):
+    store = ProjectStore(tmp_path / "composition.sqlite3")
+    spec = ScenarioSpec(name="Composed", months=1, households=120, firms=8, banks=2, seed=3)
+    project = ProjectRecordStoreMixin.create_project(
+        store, name="Composição", description="", scenario=spec
+    )
+    result = run_simulation(spec)
+    run = RunStoreMixin.save_run(
+        store,
+        project_id=project["id"],
+        scenario=spec,
+        result=result,
+        duration_ms=1.0,
+        engine_version="1.3.0",
+    )
+    assert run["project_id"] == project["id"]
+    assert store.get_run(run["id"])["id"] == run["id"]
+
+
+def test_integrity_check_detects_corruption(tmp_path):
+    import sqlite3
+    import pytest
+
+    path = tmp_path / "corrupt.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.execute("PRAGMA journal_mode = DELETE")
+    conn.execute("CREATE TABLE data(x TEXT)")
+    for i in range(500):
+        conn.execute("INSERT INTO data VALUES (?)", (f"row-{i}-" + "x" * 200,))
+    conn.execute("PRAGMA user_version = 5")
+    conn.commit()
+    conn.close()
+
+    raw = bytearray(path.read_bytes())
+    page_size = 4096
+    if len(raw) > 2 * page_size:
+        raw[page_size:2 * page_size] = bytes([0xFF]) * page_size
+    path.write_bytes(bytes(raw))
+
+    with pytest.raises(RuntimeError, match="integrity check failed"):
+        ProjectStore(path)

@@ -1,5 +1,6 @@
 import io
 import zipfile
+from xml.etree import ElementTree
 
 from fastapi.testclient import TestClient
 
@@ -13,6 +14,7 @@ from economy_lab.reporting import (
     simulation_csv_bytes,
     simulation_xlsx_bytes,
 )
+from economy_lab.reporting.exports import _xlsx_bytes
 
 
 def _scenario() -> ScenarioSpec:
@@ -59,3 +61,35 @@ def test_batch_exports_and_api_download_headers():
     assert response.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     assert "economy-lab-simulation.xlsx" in response.headers["content-disposition"]
     assert response.content[:2] == b"PK"
+
+
+def test_xlsx_export_sanitizes_invalid_xml_control_characters():
+    dirty_sheet_name = "Relat\x00rio\x01"
+    dirty_warning = "Aviso:\x00nulo\x0bcontrole\ttab\nquebra\rretorno açúcar"
+    sheets = [
+        (dirty_sheet_name, [["Título", dirty_warning], ["Linha", "valor limpo"]]),
+    ]
+
+    xlsx = _xlsx_bytes(sheets)
+
+    with zipfile.ZipFile(io.BytesIO(xlsx)) as archive:
+        workbook_xml = archive.read("xl/workbook.xml")
+        sheet_xml = archive.read("xl/worksheets/sheet1.xml")
+
+        ElementTree.fromstring(workbook_xml)
+        ElementTree.fromstring(sheet_xml)
+
+        workbook_text = workbook_xml.decode("utf-8")
+        sheet_text = sheet_xml.decode("utf-8")
+
+        assert "\x00" not in workbook_text
+        assert "\x01" not in workbook_text
+        assert "\x00" not in sheet_text
+        assert "\x0b" not in sheet_text
+
+        assert "\ufffd" in workbook_text
+        assert "\ufffd" in sheet_text
+
+        assert "\ttab\n" in sheet_text
+        assert "açúcar" in sheet_text
+        assert "valor limpo" in sheet_text

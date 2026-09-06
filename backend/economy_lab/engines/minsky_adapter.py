@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import csv
 import io
+import ipaddress
 import json
 import os
 from urllib import parse, request
@@ -19,6 +20,8 @@ from urllib.error import URLError
 
 from economy_lab.finance import Ledger, flow_matrix, stock_matrix
 from economy_lab.finance.sfc import SECTORS
+
+_MAX_REST_RESPONSE_BYTES = 16 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +79,55 @@ def minsky_rest_configured() -> bool:
     return bool(os.getenv("MINSKY_REST_URL", "").strip())
 
 
+def _is_loopback_host(hostname: str) -> bool:
+    if hostname.lower().rstrip(".") == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def _validated_minsky_rest_url(value: str) -> str:
+    if not value:
+        raise ValueError("Minsky REST URL is not configured")
+    try:
+        parsed = parse.urlsplit(value)
+        hostname = parsed.hostname
+        _ = parsed.port
+    except ValueError:
+        raise ValueError("Minsky REST URL configuration is invalid") from None
+
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ValueError("Minsky REST URL must use HTTP or HTTPS")
+    if not hostname:
+        raise ValueError("Minsky REST URL must include a hostname")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("Minsky REST URL must not include embedded credentials")
+    if parsed.query or parsed.fragment or "?" in value or "#" in value:
+        raise ValueError("Minsky REST URL must not include a query or fragment")
+    if scheme == "http" and not _is_loopback_host(hostname):
+        raise ValueError("Minsky REST URL must use HTTPS for non-loopback hosts")
+
+    path = "" if parsed.path == "/" else parsed.path
+    return parse.urlunsplit((scheme, parsed.netloc, path, "", ""))
+
+
+def _read_json_response(response) -> object:
+    declared_length = response.headers.get("Content-Length")
+    try:
+        declared_bytes = int(declared_length) if declared_length is not None else None
+    except (TypeError, ValueError):
+        declared_bytes = None
+    if declared_bytes is not None and declared_bytes > _MAX_REST_RESPONSE_BYTES:
+        raise ValueError("Minsky REST response exceeds the allowed size")
+    raw = response.read(_MAX_REST_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_REST_RESPONSE_BYTES:
+        raise ValueError("Minsky REST response exceeds the allowed size")
+    return json.loads(raw.decode("utf-8")) if raw else None
+
+
 @dataclass(frozen=True, slots=True)
 class MinskyBridgeStatus:
     configured: bool
@@ -89,18 +141,17 @@ class MinskyRestClient:
     """Client for Minsky's documented GET/PUT object REST protocol."""
 
     def __init__(self, base_url: str | None = None, timeout: float = 3.0):
-        self.base_url = (base_url or os.getenv("MINSKY_REST_URL", "")).rstrip("/")
+        configured_url = base_url or os.getenv("MINSKY_REST_URL", "")
+        self.base_url = _validated_minsky_rest_url(configured_url)
         self.timeout = timeout
-        if not self.base_url:
-            raise ValueError("Minsky REST URL is not configured")
 
     def _url(self, path: str) -> str:
-        return f"{self.base_url}/{path.lstrip('/')}"
+        separator = "" if self.base_url.endswith("/") else "/"
+        return f"{self.base_url}{separator}{path.lstrip('/')}"
 
     def get(self, path: str) -> object:
         with request.urlopen(self._url(path), timeout=self.timeout) as response:
-            raw = response.read().decode("utf-8")
-        return json.loads(raw) if raw else None
+            return _read_json_response(response)
 
     def put(self, path: str, payload: object) -> object:
         body = json.dumps(payload).encode("utf-8")
@@ -108,8 +159,7 @@ class MinskyRestClient:
             self._url(path), data=body, method="PUT", headers={"Content-Type": "application/json"}
         )
         with request.urlopen(req, timeout=self.timeout) as response:
-            raw = response.read().decode("utf-8")
-        return json.loads(raw) if raw else None
+            return _read_json_response(response)
 
     def handshake(self) -> MinskyBridgeStatus:
         try:

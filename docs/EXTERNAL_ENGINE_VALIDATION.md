@@ -1,4 +1,4 @@
-# External Engine Validation Pack — v2.0
+# External Engine Validation Pack — v2.13.1
 
 The validation pack answers a narrower question than the module status badges: **can this machine execute the exact external runtime path Economy Lab expects?**
 
@@ -38,15 +38,13 @@ Example request:
 
 ## Windows validation workflow
 
-From the extracted repository root:
+From the repository root, run:
 
 ```powershell
-cd backend
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev,simulation]"
-cd ..
 .\scripts\validate-external-engines.ps1
 ```
+
+The script requires an installed Economy Lab backend in `backend\.venv` or another compatible Python environment that can import it. Use `-InstallPythonEngines` only when Mesa/HARK packages must also be installed in the selected backend environment. For strict release qualification, run `-StrictQualification`.
 
 If Dynare is not auto-detected, set:
 
@@ -61,7 +59,7 @@ For Minsky:
 $env:MINSKY_REST_URL = "http://127.0.0.1:8000"
 ```
 
-The script writes `external-engine-validation.json` by default. Use `-Strict` in CI or release qualification when every requested engine must pass.
+By default, the script writes both `validation-reports/external-engine-qualification-YYYYMMDD-HHMMSS.json` and `validation-reports/external-engine-qualification-YYYYMMDD-HHMMSS.md`. Use `-StrictQualification` when every requested engine must pass for release qualification.
 
 ## Release rule
 

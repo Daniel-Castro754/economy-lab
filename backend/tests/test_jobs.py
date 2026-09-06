@@ -11,9 +11,35 @@ from economy_lab.core.simulation import run_simulation
 from economy_lab.jobs.manager import SimulationJobManager
 from economy_lab.main import app
 from economy_lab.storage import ProjectStore
+from economy_lab.storage.jobs import JobStoreMixin
 
 
 TERMINAL = {"completed", "failed", "cancelled"}
+
+JOB_MIXIN_METHODS = (
+    "create_job",
+    "get_job",
+    "list_jobs",
+    "start_job",
+    "recover_interrupted_jobs",
+    "queued_job_ids",
+    "update_job_progress",
+    "cancellation_requested",
+    "request_job_cancel",
+    "complete_job",
+    "fail_job",
+    "cancel_job",
+    "_job_row",
+)
+
+
+def test_project_store_inherits_job_methods_from_mixin():
+    assert issubclass(ProjectStore, JobStoreMixin)
+    for name in JOB_MIXIN_METHODS:
+        assert hasattr(ProjectStore, name)
+        assert getattr(ProjectStore, name) is getattr(JobStoreMixin, name)
+    assert "complete_project_job" not in vars(JobStoreMixin)
+    assert hasattr(ProjectStore, "complete_project_job")
 
 
 def wait_for_job(store: ProjectStore, job_id: str, timeout: float = 3.0):
@@ -71,7 +97,7 @@ def test_manager_completes_project_job_and_saves_run(tmp_path):
     assert completed["status"] == "completed"
     assert completed["run_id"] is not None
     run = store.get_run(completed["run_id"])
-    assert run["engine_version"] == "2.13.0"
+    assert run["engine_version"] == "2.13.2"
     assert run["manifest"]["seed"] == spec.seed
     assert run["manifest_hash"] is not None
 

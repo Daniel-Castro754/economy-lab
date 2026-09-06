@@ -3,18 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import json
+import math
 from typing import Callable
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 
 
 JsonFetcher = Callable[[str, int], object]
+_MAX_JSON_RESPONSE_BYTES = 16 * 1024 * 1024
 
 
 def default_json_fetcher(url: str, timeout: int) -> object:
     request = Request(url, headers={"User-Agent": "EconomyLab/2.4", "Accept": "application/json"})
     with urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed public API endpoints
-        return json.loads(response.read().decode("utf-8"))
+        declared_length = response.headers.get("Content-Length")
+        try:
+            declared_bytes = int(declared_length) if declared_length is not None else None
+        except (TypeError, ValueError):
+            declared_bytes = None
+        if declared_bytes is not None and declared_bytes > _MAX_JSON_RESPONSE_BYTES:
+            raise ValueError("External data response exceeds the allowed size")
+        raw = response.read(_MAX_JSON_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_JSON_RESPONSE_BYTES:
+        raise ValueError("External data response exceeds the allowed size")
+    return json.loads(raw.decode("utf-8"))
 
 
 def _iso_date(value: str) -> str:
@@ -33,7 +45,8 @@ def _float(value: object) -> float | None:
     if value is None:
         return None
     if isinstance(value, (int, float)):
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else None
     text = str(value).strip().replace(" ", "")
     if not text or text in {"...", "..", "-"}:
         return None
@@ -42,7 +55,8 @@ def _float(value: object) -> float | None:
     elif "," in text and "." in text:
         text = text.replace(".", "").replace(",", ".")
     try:
-        return float(text)
+        number = float(text)
+        return number if math.isfinite(number) else None
     except ValueError:
         return None
 

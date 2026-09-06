@@ -1,6 +1,6 @@
 # Controlled backend roadmap
 
-## Current milestone: v2.11 Reproducibility / Run Manifest
+## Current milestone: v2.13.1 — Observable Economy Zero and functional controls
 
 The project is in **Backend Completion**. Visual redesign and new economic domains remain frozen until backend contracts are stable.
 
@@ -30,14 +30,17 @@ The project is in **Backend Completion**. Visual redesign and new economic domai
 6. **v2.12 — Live data qualification + Calibration Profiles**
    - BCB/IBGE/World Bank/Ipeadata live qualification;
    - reusable calibrated profiles.
-7. **v2.13 — AI providers + persistent ModelSpec**
+7. **v2.13.1 — Observable Economy Zero and functional controls — implemented**
+   - persistent job progress, cancellation, timeout, failure and retry controls in the desktop UI;
+   - functional Settings and Help panels; preserved v2.11 manifests, replay and authority boundaries.
+8. **v2.13 follow-on — AI providers + persistent ModelSpec**
    - provider contract, at least one real provider, artifact persistence;
    - no direct code execution.
-8. **v2.14 — hardening**
+9. **v2.14 — hardening**
    - DB backup/migrations, logging, diagnostic export.
-9. **v2.15 — stress/performance/golden tests**
+10. **v2.15 — stress/performance/golden tests**
    - release benchmarks and invariant suite.
-10. **v3.0 — BACKEND FREEZE**
+11. **v3.0 — BACKEND FREEZE**
    - backend contract freeze; visual/product redesign becomes the primary workstream.
 
 ### Scope lock

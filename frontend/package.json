@@ -1,11 +1,12 @@
 {
   "name": "economy-lab-ui",
   "private": true,
-  "version": "2.13.0",
+  "version": "2.13.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev --config ../src-tauri/tauri.conf.json",

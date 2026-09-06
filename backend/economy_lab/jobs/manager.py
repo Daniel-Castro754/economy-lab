@@ -8,6 +8,7 @@ from threading import Event, Lock
 from time import perf_counter
 from typing import Callable
 
+from economy_lab import __version__
 from economy_lab.core.execution import (
     SimulationCancelledError,
     SimulationTimeoutError,
@@ -151,7 +152,7 @@ class SimulationJobManager:
                     scenario=scenario,
                     result=result,
                     duration_ms=(perf_counter() - started) * 1000.0,
-                    engine_version="2.13.0",
+                    engine_version=__version__,
                     save_scenario=bool(item["save_scenario"]),
                 )
                 if run_id is None:

@@ -11,7 +11,7 @@ def test_health_endpoint():
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["engine_version"] == "2.13.0"
+    assert payload["engine_version"] == "2.13.2"
 
 
 def test_desktop_webview_origin_is_allowed_by_cors():
@@ -24,6 +24,32 @@ def test_desktop_webview_origin_is_allowed_by_cors():
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://tauri.localhost"
+
+
+def test_cors_desktop_mode_allows_tauri_but_blocks_vite(monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_RUNTIME_MODE", "desktop-sidecar")
+    tauri = client.options(
+        "/api/v1/health",
+        headers={"Origin": "http://tauri.localhost", "Access-Control-Request-Method": "GET"},
+    )
+    assert tauri.status_code == 200
+    assert tauri.headers["access-control-allow-origin"] == "http://tauri.localhost"
+
+    vite = client.options(
+        "/api/v1/health",
+        headers={"Origin": "http://127.0.0.1:5173", "Access-Control-Request-Method": "GET"},
+    )
+    assert "access-control-allow-origin" not in vite.headers
+
+
+def test_cors_non_desktop_allows_vite(monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_RUNTIME_MODE", "web-local")
+    vite = client.options(
+        "/api/v1/health",
+        headers={"Origin": "http://127.0.0.1:5173", "Access-Control-Request-Method": "GET"},
+    )
+    assert vite.status_code == 200
+    assert vite.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
 
 
 def test_simulate_economy_zero_endpoint():
@@ -307,3 +333,103 @@ def test_calibration_fit_api(monkeypatch):
     })
     assert response.status_code == 200
     assert response.json()["best_scenario_patch"]["policy_rate"] == 11.0
+
+
+def test_scenario_rejects_extra_fields():
+    response = client.post(
+        "/api/v1/simulate",
+        json={
+            "name": "Extra field test",
+            "months": 2,
+            "households": 200,
+            "firms": 8,
+            "banks": 2,
+            "seed": 1,
+            "mode": "economy_zero",
+            "nonexistent_field": 42,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_scenario_rejects_nan_and_infinity():
+    import json
+
+    # Raw malformed JSON must reach the API, bypassing httpx's strict encoder.
+    for value in (float("nan"), float("inf"), -float("inf")):
+        response = client.post(
+            "/api/v1/simulate",
+            content=json.dumps({
+                "name": "Invalid number", "months": 2, "households": 200,
+                "firms": 8, "banks": 2, "seed": 1, "initial_inflation": value,
+            }),
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 422
+        assert response.json()["detail"]
+
+
+def test_project_create_rejects_extra_fields():
+    response = client.post("/api/v1/projects", json={
+        "name": "Strict", "description": "", "extra_key": True,
+        "scenario": {"name": "S", "months": 1, "households": 120, "firms": 8, "banks": 2},
+    })
+    assert response.status_code == 422
+
+
+def test_data_fetch_rejects_extra_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_DATA_CACHE", str(tmp_path))
+    response = client.post("/api/v1/data/fetch", json={
+        "source": "bcb_sgs", "series_id": "432", "bogus": 1,
+    })
+    assert response.status_code == 422
+
+
+def test_all_expected_routes_present_and_not_duplicated():
+    import warnings
+
+    expected = [
+        ("/simple/scenarios", "GET"),
+        ("/simple/start", "POST"),
+        ("/simple/step", "POST"),
+        ("/simple/run", "POST"),
+        ("/simple/to-advanced", "POST"),
+        ("/exports/simple.csv", "POST"),
+        ("/exports/simple.xlsx", "POST"),
+        ("/modules", "GET"),
+        ("/modules/{module_id}", "GET"),
+        ("/tools", "GET"),
+        ("/tools/{tool_id}", "GET"),
+        ("/authority/registry", "GET"),
+        ("/authority/plan", "POST"),
+        ("/profiles", "GET"),
+        ("/profiles/from-lab", "POST"),
+        ("/profiles/{profile_id}", "GET"),
+        ("/profiles/{profile_id}", "DELETE"),
+        ("/profiles/{profile_id}/apply", "POST"),
+        ("/simulation/presets", "GET"),
+        ("/simulation/presets/{preset_id}/apply", "POST"),
+        ("/exports/calibration.xlsx", "POST"),
+        ("/exports/simulation.csv", "POST"),
+        ("/exports/simulation.xlsx", "POST"),
+        ("/exports/batch.csv", "POST"),
+        ("/exports/batch.xlsx", "POST"),
+        ("/data/catalog", "GET"),
+        ("/data/cache/status", "GET"),
+        ("/data/fetch", "POST"),
+        ("/scenario/compile", "POST"),
+        ("/model/providers", "GET"),
+        ("/model/compile", "POST"),
+        ("/model/validate", "POST"),
+        ("/model/to-scenario", "POST"),
+    ]
+
+    # Verify the public schema, including nested routers. Duplicate operation
+    # IDs are reported by FastAPI while generating OpenAPI.
+    app.openapi_schema = None
+    with warnings.catch_warnings(record=True) as emitted:
+        warnings.simplefilter("always")
+        schema = app.openapi()
+    assert not any("Duplicate Operation ID" in str(item.message) for item in emitted)
+    for path, method in expected:
+        assert method.lower() in schema["paths"].get(f"/api/v1{path}", {}), f"Missing route: {method} {path}"
