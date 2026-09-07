@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+def _check_finite_floats(model: BaseModel) -> None:
+    """Raise ValueError if any float field on *model* is NaN or ±Inf."""
+    for name, value in model.__dict__.items():
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError(f"field '{name}' must be a finite number, got {value}")
 
 
 class HealthResponse(BaseModel):
@@ -17,6 +25,8 @@ class HealthResponse(BaseModel):
 
 
 class EconomicShockSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     kind: Literal[
         "fiscal_spending",
         "productivity",
@@ -31,6 +41,8 @@ class EconomicShockSpec(BaseModel):
 
 
 class ScenarioDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     prompt: str = Field(min_length=1, max_length=4000)
     base: "ScenarioSpec | None" = None
 
@@ -44,6 +56,8 @@ class ScenarioDraftResponse(BaseModel):
 
 
 class FinancialGuidancePoint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     month: int = Field(ge=1, le=240)
     minimum_bank_capital_ratio: float = Field(default=8.0, ge=0, le=30)
     target_reserve_ratio: float = Field(default=10.0, ge=0, le=100)
@@ -65,6 +79,8 @@ class FinancialGuidancePoint(BaseModel):
 
 
 class DataProvenanceRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     source_id: str = Field(min_length=1, max_length=80)
     series_id: str = Field(min_length=1, max_length=160)
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -77,6 +93,8 @@ class DataProvenanceRecord(BaseModel):
 
 class ScenarioSpec(BaseModel):
     """Validated contract between UI/AI and the simulation kernel."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     name: str = Field(default="Economy Zero", min_length=1, max_length=80)
     months: int = Field(default=24, ge=1, le=240)
@@ -167,6 +185,7 @@ class ScenarioSpec(BaseModel):
 
     @model_validator(mode="after")
     def validate_population_structure(self):
+        _check_finite_floats(self)
         if self.firms >= self.households:
             raise ValueError("firms must be fewer than households in Economy Zero")
         if self.macro_engine == "off" and self.macro_coupling == "hybrid":
@@ -536,6 +555,8 @@ class SimulationResult(BaseModel):
 
 
 class ExternalValidationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     engines: list[Literal["mesa", "hark", "dynare", "minsky"]] = Field(
         default_factory=lambda: ["mesa", "hark", "dynare", "minsky"],
         min_length=1, max_length=4,
@@ -658,6 +679,8 @@ class MinskyGodleyCellMappingSpec(BaseModel):
 
 
 class MinskyReconciliationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     canonical: MinskyExchangeResponse
     template_id: str = Field(min_length=1, max_length=120)
     template_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
@@ -736,12 +759,16 @@ class StorageStatusResponse(BaseModel):
 
 
 class ProjectCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=1000)
     scenario: ScenarioSpec
 
 
 class ProjectUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=1000)
     scenario: ScenarioSpec | None = None
@@ -762,6 +789,8 @@ class ProjectRecord(ProjectSummary):
 
 
 class ProjectRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec | None = None
     save_scenario: bool = True
 
@@ -770,6 +799,8 @@ JobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 
 
 class SimulationJobCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
     project_id: str | None = None
     save_scenario: bool = True
@@ -777,6 +808,8 @@ class SimulationJobCreateRequest(BaseModel):
 
 
 class ProjectSimulationJobCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec | None = None
     save_scenario: bool = True
     timeout_seconds: float = Field(default=300.0, ge=1.0, le=3600.0)
@@ -897,6 +930,8 @@ BatchAxis = Literal[
 
 
 class BatchExperimentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     base: ScenarioSpec
     axis: BatchAxis = "policy_rate"
     values: list[float] = Field(default_factory=lambda: [8.0, 10.0, 12.0, 14.0, 16.0], min_length=2, max_length=12)
@@ -913,6 +948,8 @@ class BatchExperimentRequest(BaseModel):
 
 
 class ProjectBatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     axis: BatchAxis = "policy_rate"
     values: list[float] = Field(default_factory=lambda: [8.0, 10.0, 12.0, 14.0, 16.0], min_length=2, max_length=12)
     repetitions: int = Field(default=3, ge=1, le=10)
@@ -995,6 +1032,8 @@ ProfileKind = Literal["macro", "financial", "agents", "households", "households_
 
 
 class LabProfileCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     module_id: Literal["dynare", "minsky", "mesa", "hark"]
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=1000)
@@ -1019,6 +1058,8 @@ class ProfileRecord(ProfileSummary):
 
 
 class ProfileApplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
 
 
@@ -1037,6 +1078,8 @@ class SimulationPresetInfo(BaseModel):
 
 
 class PresetApplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
 
 
@@ -1066,6 +1109,8 @@ class HubToolInfo(BaseModel):
 
 
 class DynareLabRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     irf_periods: int = Field(default=24, ge=1, le=160)
     monetary_shock_bp: float = Field(default=100.0, gt=0, le=2000)
     neutral_nominal_rate: float = Field(default=8.0, ge=-5, le=100)
@@ -1098,6 +1143,8 @@ class DynareLabResponse(BaseModel):
 
 
 class MesaLabRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     agents: int = Field(default=100, ge=10, le=10000)
     steps: int = Field(default=100, ge=1, le=5000)
     initial_wealth: float = Field(default=10.0, gt=0, le=1_000_000)
@@ -1138,6 +1185,8 @@ class MesaLabResponse(BaseModel):
 
 
 class MesaComponentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     component: Literal["activation", "household_search", "firm_behavior", "labor_market"]
     steps: int = Field(default=60, ge=1, le=2000)
     seed: int = Field(default=42, ge=0, le=2_147_483_647)
@@ -1160,6 +1209,8 @@ class MesaComponentResponse(BaseModel):
 
 
 class HarkLabRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     annual_interest_rate: float = Field(default=0.08, ge=-0.20, le=2.0)
     crra: float = Field(default=2.0, gt=0.05, le=20)
     annual_discount_factor: float = Field(default=0.96, gt=0.5, lt=1.0)
@@ -1206,6 +1257,8 @@ class MinskyFinancialMapping(BaseModel):
 
 
 class MinskyFinancialCaptureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     steps: int = Field(default=12, ge=1, le=240)
     reset_before: bool = False
     unit_mode: Literal["decimal", "percent"] = "decimal"
@@ -1221,6 +1274,8 @@ class MinskyFinancialCaptureResponse(BaseModel):
 
 
 class MinskyLabCommandRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_strip_whitespace=True)
+
     action: Literal["members", "signature", "step", "reset", "get_variable", "set_variable"]
     path: str = Field(default="/minsky", min_length=1, max_length=512)
     variable_id: str | None = Field(default=None, max_length=256)
@@ -1234,11 +1289,15 @@ class MinskyLabCommandResponse(BaseModel):
 
 
 class SimulationExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
     result: SimulationResult
 
 
 class BatchExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     result: BatchExperimentResponse
 
 
@@ -1255,11 +1314,15 @@ CalibrationParameter = Literal[
 
 
 class EconomicObservation(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     date: str
     value: float
 
 
 class DataFetchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_strip_whitespace=True)
+
     source: DataSourceId
     series_id: str = Field(min_length=1, max_length=160)
     title: str = Field(default="", max_length=200)
@@ -1293,6 +1356,7 @@ class EconomicSeriesResponse(BaseModel):
     request_url: str
     metadata: dict[str, object] = Field(default_factory=dict)
     observations: list[EconomicObservation]
+    provenance: DataProvenanceRecord | None = None
     warning: str
 
 
@@ -1312,6 +1376,8 @@ class DataCacheStatus(BaseModel):
 
 
 class CalibrationTargetSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     metric: CalibrationMetric
     series: EconomicSeriesResponse
     statistic: CalibrationStatistic = "last"
@@ -1323,6 +1389,8 @@ class CalibrationTargetSpec(BaseModel):
 
 
 class CalibrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
     result: SimulationResult
     targets: list[CalibrationTargetSpec] = Field(min_length=1, max_length=12)
@@ -1378,6 +1446,8 @@ class CalibrationResponse(BaseModel):
 
 
 class CalibrationFitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
     targets: list[CalibrationTargetSpec] = Field(min_length=1, max_length=12)
     parameters: list[CalibrationParameter] = Field(default_factory=lambda: ["initial_inflation", "initial_unemployment", "policy_rate"], min_length=1, max_length=7)
@@ -1434,6 +1504,8 @@ class CalibrationFitResponse(BaseModel):
 
 
 class CalibrationExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scenario: ScenarioSpec
     calibration: CalibrationResponse
     fit: CalibrationFitResponse | None = None
@@ -1548,6 +1620,8 @@ class ModelCompilationReport(BaseModel):
 
 
 class ModelDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     prompt: str = Field(min_length=1, max_length=4000)
     base: ModelSpec | None = None
 
@@ -1563,6 +1637,8 @@ class ModelDraftResponse(BaseModel):
 
 
 class ModelCandidateValidationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     candidate: dict[str, object]
 
 
@@ -1574,6 +1650,8 @@ class ModelCandidateValidationResponse(BaseModel):
 
 
 class ModelToScenarioRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     model_spec: ModelSpec
     base_scenario: ScenarioSpec | None = None
 

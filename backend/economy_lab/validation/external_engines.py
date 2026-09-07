@@ -29,6 +29,8 @@ from time import perf_counter
 from typing import Iterable, Literal
 from uuid import uuid4
 
+from economy_lab import __version__
+
 EngineName = Literal["mesa", "hark", "dynare", "minsky"]
 CheckStatus = Literal["pass", "fail", "unavailable"]
 StageStatus = Literal["pass", "fail", "unavailable", "skipped"]
@@ -682,7 +684,7 @@ def validate_external_engines(
     integration_tests: bool = True,
     dynare_timeout_seconds: int = 60,
     minsky_timeout_seconds: float = 3.0,
-    economy_lab_version: str = "2.13.0",
+    economy_lab_version: str = __version__,
 ) -> ExternalValidationReport:
     requested: list[EngineName] = []
     for engine in engines:

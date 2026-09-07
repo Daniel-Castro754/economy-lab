@@ -2,27 +2,31 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 SimpleScenarioId = Literal["baseline", "global_recession", "volatile"]
 
 
-class SimpleExternalYear(BaseModel):
+class SimpleModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+class SimpleExternalYear(SimpleModel):
     year: int = Field(ge=1, le=7)
     world_growth: float
     consumer_confidence: float = Field(ge=0, le=100)
     label: str = ""
 
 
-class SimpleScenarioInfo(BaseModel):
+class SimpleScenarioInfo(SimpleModel):
     id: SimpleScenarioId
     title: str
     description: str
     years: list[SimpleExternalYear]
 
 
-class SimpleInitialConfig(BaseModel):
+class SimpleInitialConfig(SimpleModel):
     scenario_id: SimpleScenarioId = "baseline"
     initial_gdp_index: float = Field(default=100.0, gt=0)
     initial_potential_gdp_index: float = Field(default=100.0, gt=0)
@@ -39,14 +43,14 @@ class SimpleInitialConfig(BaseModel):
     baseline_government_spending: float = Field(default=22.0, ge=0, le=60)
 
 
-class SimplePolicyDecision(BaseModel):
+class SimplePolicyDecision(SimpleModel):
     interest_rate: float = Field(default=4.0, ge=-5, le=40)
     income_tax: float = Field(default=20.0, ge=0, le=60)
     corporate_tax: float = Field(default=22.0, ge=0, le=60)
     government_spending: float = Field(default=22.0, ge=0, le=60, description="Government primary spending as % of GDP")
 
 
-class SimpleEconomyState(BaseModel):
+class SimpleEconomyState(SimpleModel):
     year: int = Field(default=0, ge=0, le=7)
     gdp_index: float = Field(gt=0)
     potential_gdp_index: float = Field(gt=0)
@@ -67,7 +71,7 @@ class SimpleEconomyState(BaseModel):
     last_government_spending: float
 
 
-class SimpleScoreBreakdown(BaseModel):
+class SimpleScoreBreakdown(SimpleModel):
     growth: float = Field(ge=0, le=25)
     unemployment: float = Field(ge=0, le=25)
     inflation: float = Field(ge=0, le=25)
@@ -75,7 +79,7 @@ class SimpleScoreBreakdown(BaseModel):
     total: float = Field(ge=0, le=100)
 
 
-class SimpleYearResult(BaseModel):
+class SimpleYearResult(SimpleModel):
     year: int = Field(ge=1, le=7)
     external: SimpleExternalYear
     decision: SimplePolicyDecision
@@ -85,7 +89,7 @@ class SimpleYearResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class SimpleStartResponse(BaseModel):
+class SimpleStartResponse(SimpleModel):
     model: str = "simple-macro-policy-v1"
     warning: str
     config: SimpleInitialConfig
@@ -93,7 +97,7 @@ class SimpleStartResponse(BaseModel):
     next_external: SimpleExternalYear
 
 
-class SimpleStepRequest(BaseModel):
+class SimpleStepRequest(SimpleModel):
     config: SimpleInitialConfig
     state: SimpleEconomyState
     decision: SimplePolicyDecision
@@ -105,19 +109,19 @@ class SimpleStepRequest(BaseModel):
         return self
 
 
-class SimpleStepResponse(BaseModel):
+class SimpleStepResponse(SimpleModel):
     model: str = "simple-macro-policy-v1"
     result: SimpleYearResult
     completed: bool
     next_external: SimpleExternalYear | None = None
 
 
-class SimpleRunRequest(BaseModel):
+class SimpleRunRequest(SimpleModel):
     config: SimpleInitialConfig = Field(default_factory=SimpleInitialConfig)
     decisions: list[SimplePolicyDecision] = Field(min_length=1, max_length=7)
 
 
-class SimpleRunResult(BaseModel):
+class SimpleRunResult(SimpleModel):
     model: str = "simple-macro-policy-v1"
     warning: str
     config: SimpleInitialConfig
@@ -127,14 +131,14 @@ class SimpleRunResult(BaseModel):
     completed_years: int
 
 
-class SimpleToAdvancedRequest(BaseModel):
+class SimpleToAdvancedRequest(SimpleModel):
     config: SimpleInitialConfig
     state: SimpleEconomyState
     decision: SimplePolicyDecision | None = None
     months: int = Field(default=24, ge=1, le=240)
 
 
-class SimpleToAdvancedResponse(BaseModel):
+class SimpleToAdvancedResponse(SimpleModel):
     scenario: dict[str, object]
     mapped_fields: list[str]
     limitations: list[str]

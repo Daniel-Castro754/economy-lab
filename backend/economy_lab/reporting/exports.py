@@ -10,6 +10,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any, Iterable
 from xml.sax.saxutils import escape
 
+from economy_lab import __version__
 from economy_lab.core.schemas import BatchExperimentResponse, ScenarioSpec, SimulationResult
 from economy_lab.simple.models import SimpleRunResult
 
@@ -28,6 +29,15 @@ def _stringify(value: Any) -> str:
     if isinstance(value, (dict, list, tuple)):
         return json.dumps(value, ensure_ascii=False, sort_keys=True)
     return str(value)
+
+
+_INVALID_XML_CHARS_RE = re.compile(
+    "[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD\U00010000-\U0010FFFF]"
+)
+
+
+def _sanitize_xml_text(value: str) -> str:
+    return _INVALID_XML_CHARS_RE.sub("\ufffd", value)
 
 
 def _csv_bytes(headers: list[str], rows: Iterable[Iterable[Any]]) -> bytes:
@@ -65,7 +75,8 @@ def _col_name(index: int) -> str:
 
 
 def _sheet_name(name: str, used: set[str]) -> str:
-    safe = re.sub(r"[\\/*?:\[\]]", "-", name).strip()[:31] or "Sheet"
+    sanitized = _sanitize_xml_text(name)
+    safe = re.sub(r"[\\/*?:\[\]]", "-", sanitized).strip()[:31] or "Sheet"
     base = safe
     counter = 2
     while safe in used:
@@ -84,7 +95,7 @@ def _cell_xml(ref: str, value: Any, header: bool = False) -> str:
         return f'<c r="{ref}" t="b"{style}><v>{1 if value else 0}</v></c>'
     if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)):
         return f'<c r="{ref}"{style}><v>{value}</v></c>'
-    text = escape(_stringify(value))
+    text = escape(_sanitize_xml_text(_stringify(value)))
     preserve = ' xml:space="preserve"' if text != text.strip() else ""
     return f'<c r="{ref}" t="inlineStr"{style}><is><t{preserve}>{text}</t></is></c>'
 
@@ -202,7 +213,7 @@ def simulation_xlsx_bytes(scenario: ScenarioSpec, result: SimulationResult) -> b
     summary = result.summary.model_dump(mode="python")
     scenario_values = scenario.model_dump(mode="python")
     sheets: list[tuple[str, list[list[Any]]]] = [
-        ("Resumo", [["Economy Lab v2.13.0", result.scenario], ["Modelo", result.model], ["Aviso", result.warning], []] + _kv_rows(summary, "Indicador")),
+        ("Resumo", [[f"Economy Lab v{__version__}", result.scenario], ["Modelo", result.model], ["Aviso", result.warning], []] + _kv_rows(summary, "Indicador")),
         ("Cenário", _kv_rows(scenario_values, "Parâmetro")),
         ("Série mensal", _dict_rows([point.model_dump(mode="python") for point in result.series])),
     ]
@@ -272,7 +283,7 @@ def simulation_xlsx_bytes(scenario: ScenarioSpec, result: SimulationResult) -> b
 
 def batch_xlsx_bytes(result: BatchExperimentResponse) -> bytes:
     sheets: list[tuple[str, list[list[Any]]]] = [
-        ("Resumo", [["Economy Lab v2.13.0", "Experimento em lote"], ["Eixo", result.axis], ["Repetições", result.repetitions], ["Execuções", result.total_runs], ["Analytics", result.analytics_engine], ["Aviso", result.warning]]),
+        ("Resumo", [[f"Economy Lab v{__version__}", "Experimento em lote"], ["Eixo", result.axis], ["Repetições", result.repetitions], ["Execuções", result.total_runs], ["Analytics", result.analytics_engine], ["Aviso", result.warning]]),
         ("Comparação", _dict_rows([item.model_dump(mode="python") for item in result.aggregates])),
         ("Execuções", _dict_rows([item.model_dump(mode="python") for item in result.runs])),
         ("Cenário base", _kv_rows(result.base_scenario.model_dump(mode="python"), "Parâmetro")),
@@ -296,7 +307,7 @@ def calibration_xlsx_bytes(scenario, calibration, fit=None) -> bytes:
             })
     sheets: list[tuple[str, list[list[Any]]]] = [
         ("Resumo calibração", [
-            ["Economy Lab v2.13.0", "Calibration/Data Layer"],
+            [f"Economy Lab v{__version__}", "Calibration/Data Layer"],
             ["Score", calibration.score],
             ["Normalized RMSE", calibration.normalized_rmse],
             ["Revisão obrigatória", calibration.requires_review],
@@ -379,7 +390,7 @@ def simple_xlsx_bytes(result: SimpleRunResult) -> bytes:
             "year": item.year, "explanation": " | ".join(item.explanation), "warnings": " | ".join(item.warnings)
         })
     sheets = [
-        ("Resumo", [["Economy Lab v2.13.0", "Simple Macro"], ["Cenário", result.config.scenario_id], ["Anos executados", result.completed_years], ["Aviso", result.warning], [],
+        ("Resumo", [[f"Economy Lab v{__version__}", "Simple Macro"], ["Cenário", result.config.scenario_id], ["Anos executados", result.completed_years], ["Aviso", result.warning], [],
                     ["Indicador final", "Valor"], ["PIB índice", result.final_state.gdp_index], ["Crescimento PIB", result.final_state.real_gdp_growth],
                     ["Inflação", result.final_state.inflation], ["Desemprego", result.final_state.unemployment],
                     ["Déficit/PIB", result.final_state.budget_deficit_to_gdp], ["Dívida/PIB", result.final_state.debt_to_gdp], ["Aprovação", result.final_state.approval]]),

@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { BatchAxis, BatchExperimentResponse, compileScenario, createLabProfile, createProject, deleteProfile, deleteProject, DesktopRuntimeStatus, DynareStatus, ExperimentSummary, exportBatchFile, exportMinsky, exportSimulationFile, getDesktopRuntimeStatus, getDynareStatus, getExperiment, getHealth, getMinskyStatus, getProject, getRun, getStorageStatus, HealthResponse, HubModuleInfo, HubToolInfo, listModules, listProfiles, listSimulationPresets, listTools, listProjectExperiments, listProjectRuns, listProjects, MinskyStatus, ProfileSummary, ProjectSummary, runBatchExperiment, runProjectExperiment, RunSummary, ScenarioDraft, ScenarioSpec, SimulationPresetInfo, SimulationResult, simulate, simulateProject, StorageStatus, updateProject, applyProfile, applySimulationPreset } from "./api";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { BatchAxis, BatchExperimentResponse, cancelSimulationJob, compileScenario, createLabProfile, createProject, createSimulationJob, deleteProfile, deleteProject, DesktopRuntimeStatus, DynareStatus, ExperimentSummary, exportBatchFile, exportMinsky, exportSimulationFile, getDesktopRuntimeStatus, getDynareStatus, getExperiment, getHealth, getMinskyStatus, getProject, getRun, getSimulationJob, getStorageStatus, HealthResponse, HubModuleInfo, HubToolInfo, listModules, listProfiles, listSimulationPresets, listTools, listProjectExperiments, listProjectRuns, listProjects, MinskyStatus, ProfileSummary, ProjectSummary, runBatchExperiment, runProjectExperiment, RunSummary, ScenarioDraft, ScenarioSpec, SimulationJobRecord, SimulationPresetInfo, SimulationResult, StorageStatus, updateProject, applyProfile, applySimulationPreset } from "./api";
 import { BatchBarChart, TimeSeriesChart } from "./components/Charts";
 import { ModuleWorkspace } from "./components/ModuleWorkspace";
 import { LabWorkspace } from "./components/LabWorkspace";
@@ -8,94 +8,9 @@ import { DataCalibrationWorkspace } from "./components/DataCalibrationWorkspace"
 import { ModelBuilderWorkspace } from "./components/ModelBuilderWorkspace";
 import { SimpleMacroWorkspace } from "./components/SimpleMacroWorkspace";
 import { DesktopChrome } from "./components/DesktopChrome";
-
-const initial: ScenarioSpec = {
-  name: "Economy Zero",
-  months: 24,
-  initial_gdp: 100,
-  initial_inflation: 4,
-  initial_unemployment: 7,
-  policy_rate: 10,
-  income_tax: 20,
-  public_spending_change: 0,
-  households: 5000,
-  firms: 100,
-  banks: 3,
-  seed: 42,
-  mode: "economy_zero",
-  activation_engine: "native",
-  mesa_activation_pattern: "random",
-  household_shopping_sample_size: 4,
-  household_cheapest_choice_probability: 1,
-  firm_price_adjustment_strength: 1,
-  firm_hiring_strength: 1,
-  firm_layoff_strength: 1,
-  labor_matching_efficiency: 1,
-  initial_capital_per_worker: 1200,
-  capital_unit_cost: 25,
-  annual_capital_depreciation_rate: 8,
-  firm_investment_propensity: 12,
-  capital_output_elasticity: 0.30,
-  household_behavior: "heuristic",
-  minimum_bank_capital_ratio: 8,
-  target_reserve_ratio: 10,
-  financial_engine: "native",
-  bank_credit_supply_factor: 1,
-  default_writeoff_ratio: 35,
-  interbank_spread: 1,
-  central_bank_penalty_spread: 2,
-  household_credit_enabled: true,
-  household_credit_income_multiple: 0.50,
-  household_credit_liquidity_target_months: 3,
-  household_credit_spread: 6,
-  household_principal_repayment_rate: 4,
-  household_default_writeoff_ratio: 50,
-  bank_resolution_mode: "government_recapitalization",
-  bank_resolution_trigger_ratio: 2,
-  bank_resolution_target_ratio: 10,
-  bail_in_household_protection: 2000,
-  bail_in_firm_protection: 20000,
-  financial_guidance: [],
-  macro_engine: "off",
-  dynare_monetary_shock_bp: 100,
-  dynare_irf_periods: 24,
-  dynare_neutral_nominal_rate: 8,
-  dynare_beta: 0.99,
-  dynare_sigma: 1,
-  dynare_kappa: 0.10,
-  dynare_rho_i: 0.80,
-  dynare_phi_pi: 1.50,
-  dynare_phi_x: 0.25,
-  hark_crra: 2,
-  hark_annual_discount_factor: 0.96,
-  hark_state_mode: "employment_income",
-  hark_unemployment_probability: 0.05,
-  hark_unemployment_replacement_rate: 0.30,
-  hark_permanent_shock_std: 0.04,
-  hark_transitory_shock_std: 0.10,
-  hark_permanent_income_memory: 0.18,
-  hark_income_groups: 5,
-  hark_income_risk_dispersion: 0.35,
-  unemployment_benefits_enabled: true,
-  unemployment_benefit_replacement_rate: 45,
-  unemployment_benefit_waiting_months: 1,
-  unemployment_benefit_max_months: 6,
-  unemployment_benefit_cap: 3500,
-  labor_supply_mode: "reservation_wage",
-  labor_search_intensity: 0.90,
-  reservation_wage_ratio: 0.75,
-  benefit_search_disincentive: 0.20,
-  wealth_search_disincentive: 0.10,
-  job_separation_risk_memory: 0.25,
-  macro_coupling: "advisory",
-  macro_coupling_strength: 0.35,
-  macro_feedback_strength: 0.15,
-  macro_recalibration: "static_irf",
-  macro_recalibration_strength: 0.25,
-  macro_max_recalibrations: 80,
-  shocks: [],
-  applied_profiles: {}
-};
+import { ProjectPanel } from "./components/ProjectPanel";
+import { ProfilePanel } from "./components/ProfilePanel";
+import { createDefaultScenario } from "./defaultScenario";
 
 const sectorLabels: Record<string, string> = {
   households: "Famílias",
@@ -137,9 +52,29 @@ function when(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
 
+function jobStageLabel(stage: string) {
+  const labels: Record<string, string> = {
+    queued: "Na fila", preparing: "Preparando agentes", initializing: "Preparando agentes", simulating: "Simulando economia",
+    finalizing: "Consolidando resultados", finalized: "Resultados consolidados", persisting: "Salvando resultado", completed: "Concluída", failed: "Falhou",
+    cancelled: "Cancelada", "external-engine-failed": "Falha em motor externo",
+  };
+  return labels[stage] ?? stage.replaceAll("-", " ");
+}
+
+// Returns a referentially-stable function that always invokes the latest render's closure.
+// Used to hand a stable prop (e.g. to a React.memo'd child) to a handler that itself calls
+// several non-memoized functions — a plain useCallback here would need every one of those
+// transitively memoized too, or risk a stale-closure bug from a missing dependency.
+function useStableCallback<Args extends unknown[], R>(callback: (...args: Args) => R): (...args: Args) => R {
+  const callbackRef = useRef(callback);
+  useEffect(() => { callbackRef.current = callback; });
+  return useCallback((...args: Args) => callbackRef.current(...args), []);
+}
+
 export default function App() {
-  const [spec, setSpec] = useState(initial);
+  const [spec, setSpec] = useState<ScenarioSpec>(createDefaultScenario);
   const [result, setResult] = useState<SimulationResult | null>(null);
+  const [resultScenario, setResultScenario] = useState<ScenarioSpec | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [minskyStatus, setMinskyStatus] = useState<MinskyStatus | null>(null);
   const [dynareStatus, setDynareStatus] = useState<DynareStatus | null>(null);
@@ -162,8 +97,19 @@ export default function App() {
   const [activeModule, setActiveModule] = useState("simulation");
   const [moduleTools, setModuleTools] = useState<HubToolInfo[]>([]);
   const [activeTool, setActiveTool] = useState<string>("simulation-simple");
+  const [simulationLevel, setSimulationLevel] = useState<"simple" | "economy-zero" | "advanced">("simple");
   const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
   const [presets, setPresets] = useState<SimulationPresetInfo[]>([]);
+  const [simulationJob, setSimulationJob] = useState<SimulationJobRecord | null>(null);
+  const [simulationError, setSimulationError] = useState("");
+  const [monitoringJob, setMonitoringJob] = useState(false);
+  const [simulationTimeout, setSimulationTimeout] = useState(() => {
+    const stored = Number(localStorage.getItem("economy-lab-timeout") ?? 300);
+    return [120, 300, 600, 1200].includes(stored) ? stored : 300;
+  });
+  const [autoOpenResults, setAutoOpenResults] = useState(() => localStorage.getItem("economy-lab-auto-results") !== "false");
+  const resultsPanelRef = useRef<HTMLElement>(null);
+  const simulationLockRef = useRef(false);
 
   useEffect(() => {
     getDesktopRuntimeStatus().then(setDesktopRuntime).catch(() => setDesktopRuntime(null));
@@ -203,17 +149,19 @@ export default function App() {
   }
 
   async function refreshProjects(selectedId?: string | null) {
-    const next = await listProjects();
+    const [next, storageStatus] = await Promise.all([listProjects(), getStorageStatus()]);
     setProjects(next);
-    setStorage(await getStorageStatus());
+    setStorage(storageStatus);
     const id = selectedId === undefined ? projectId : selectedId;
     if (id) {
-      setRuns(await listProjectRuns(id, 20));
-      setExperiments(await listProjectExperiments(id, 10));
+      const [runsList, experimentsList] = await Promise.all([listProjectRuns(id, 20), listProjectExperiments(id, 10)]);
+      setRuns(runsList);
+      setExperiments(experimentsList);
     }
   }
 
   async function onOpenProject(id: string) {
+    if (simulationLockRef.current || jobIsActive) { setStatus("Aguarde a simulação terminar antes de trocar de projeto"); return; }
     if (!id) {
       setProjectId(null);
       setRuns([]);
@@ -226,9 +174,11 @@ export default function App() {
       setProjectName(project.name);
       setProjectDescription(project.description);
       setSpec(project.scenario);
-      setRuns(await listProjectRuns(project.id, 20));
-      setExperiments(await listProjectExperiments(project.id, 10));
+      const [openRuns, openExperiments] = await Promise.all([listProjectRuns(project.id, 20), listProjectExperiments(project.id, 10)]);
+      setRuns(openRuns);
+      setExperiments(openExperiments);
       setResult(null);
+      setResultScenario(null);
       setBatchResult(null);
       setStatus("Projeto aberto");
     } catch (error) {
@@ -237,6 +187,7 @@ export default function App() {
   }
 
   async function onSaveProject() {
+    if (simulationLockRef.current || jobIsActive) { setStatus("Aguarde a simulação terminar antes de salvar"); return; }
     setStatus("Salvando projeto…");
     try {
       const project = projectId
@@ -253,11 +204,13 @@ export default function App() {
   }
 
   function onNewProject() {
+    if (simulationLockRef.current || jobIsActive) { setStatus("Aguarde a simulação terminar antes de criar novo projeto"); return; }
     setProjectId(null);
     setProjectName("Novo projeto");
     setProjectDescription("");
-    setSpec(initial);
+    setSpec(createDefaultScenario());
     setResult(null);
+    setResultScenario(null);
     setRuns([]);
     setExperiments([]);
     setBatchResult(null);
@@ -266,6 +219,7 @@ export default function App() {
   }
 
   async function onDeleteProject() {
+    if (simulationLockRef.current || jobIsActive) { setStatus("Aguarde a simulação terminar antes de excluir"); return; }
     if (!projectId) return;
     if (!window.confirm(`Excluir o projeto "${projectName}" e todo o histórico de execuções?`)) return;
     setStatus("Excluindo projeto…");
@@ -280,11 +234,13 @@ export default function App() {
   }
 
   async function onOpenRun(runId: string) {
+    if (simulationLockRef.current || jobIsActive) return;
     setStatus("Abrindo execução salva…");
     try {
       const run = await getRun(runId);
       setSpec(run.scenario);
       setResult(run.result);
+      setResultScenario(run.scenario);
       setStatus(`Execução de ${when(run.created_at)} carregada`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Falha ao abrir execução");
@@ -327,22 +283,78 @@ export default function App() {
     }
   }
 
+  const jobIsActive = simulationJob?.status === "queued" || simulationJob?.status === "running";
+
+  const availableEngines: Record<string, boolean> = { mesa: !!health?.mesa_available, hark: !!health?.hark_available, dynare: !!health?.dynare_ready };
+  const missingEngines = health ? [spec.activation_engine === "mesa" && !health.mesa_available ? "Mesa" : "", spec.household_behavior === "hark" && !health.hark_available ? "HARK" : "", spec.macro_engine === "dynare" && !health.dynare_ready ? "Dynare" : ""].filter(Boolean) : [];
+
+  async function runEconomyZero() {
+    if (!jobIsActive && missingEngines.length) {
+      const message = `O cenário solicita ${missingEngines.join(", ")}, indisponível neste ambiente. Abra Configurações → Motores ou aplique Basic para usar os motores nativos.`;
+      setSimulationError(message); setStatus(message); return;
+    }
+    if (simulationLockRef.current) return;
+    simulationLockRef.current = true;
+    setMonitoringJob(true);
+    setSimulationError("");
+    setResult(null);
+    setResultScenario(null);
+    setStatus(projectId ? "Enviando simulação para a fila local…" : "Enviando simulação para a fila local…");
+    try {
+      // Reconnect to the same job after a polling failure; never submit a duplicate.
+      let job = jobIsActive && simulationJob
+        ? await getSimulationJob(simulationJob.id)
+        : await createSimulationJob(spec, projectId, simulationTimeout);
+      setSimulationJob(job);
+      setStatus(`${jobStageLabel(job.stage)} · ${job.progress.toFixed(0)}%`);
+
+      while (job.status === "queued" || job.status === "running") {
+        await new Promise(resolve => window.setTimeout(resolve, 400));
+        job = await getSimulationJob(job.id);
+        setSimulationJob(job);
+        setStatus(`${jobStageLabel(job.stage)} · ${job.progress.toFixed(0)}% · ${job.current_step}/${job.total_steps}`);
+      }
+
+      if (job.status === "completed" && job.result) {
+        setResult(job.result);
+        setResultScenario(job.scenario);
+        setStatus(job.project_id ? "Simulação concluída e salva no histórico" : "Simulação concluída");
+        if (job.project_id) {
+          try { await refreshProjects(job.project_id); }
+          catch { setStatus("Simulação concluída. Não foi possível atualizar a lista do histórico; reabra o projeto para consultar."); }
+        }
+        if (autoOpenResults) window.setTimeout(() => resultsPanelRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 50);
+        return;
+      }
+
+      const failure = job.error_message || (job.status === "cancelled" ? "Simulação cancelada pelo usuário." : "A simulação terminou sem retornar resultado.");
+      setSimulationError(failure);
+      setStatus(failure);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida na simulação";
+      setSimulationError(message);
+      setStatus(message);
+    } finally {
+      simulationLockRef.current = false;
+      setMonitoringJob(false);
+    }
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    setStatus(projectId ? "Simulando e salvando…" : "Simulando…");
+    await runEconomyZero();
+  }
+
+  async function onCancelSimulation() {
+    if (!simulationJob || !jobIsActive) return;
     try {
-      if (projectId) {
-        const saved = await simulateProject(projectId, spec);
-        setResult(saved.result);
-        setProjectName(saved.project.name);
-        await refreshProjects(projectId);
-        setStatus("Concluído e salvo no histórico");
-      } else {
-        setResult(await simulate(spec));
-        setStatus("Concluído (execução não salva)");
-      }
+      const cancelled = await cancelSimulationJob(simulationJob.id);
+      setSimulationJob(cancelled);
+      setStatus("Cancelamento solicitado; aguardando o próximo checkpoint mensal…");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Falha desconhecida");
+      const message = error instanceof Error ? error.message : "Falha ao cancelar simulação";
+      setSimulationError(message);
+      setStatus(message);
     }
   }
 
@@ -350,7 +362,7 @@ export default function App() {
     if (!result) return;
     setStatus(`Exportando simulação para ${format.toUpperCase()}…`);
     try {
-      await exportSimulationFile(format, spec, result);
+      await exportSimulationFile(format, resultScenario ?? spec, result);
       setStatus(`Exportação ${format.toUpperCase()} concluída`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Falha na exportação");
@@ -368,41 +380,46 @@ export default function App() {
     }
   }
 
-  function onChromeAction(action: string) {
-    const openSimulation = (tool: string, message: string) => {
+  const onChromeAction = useStableCallback((action: string) => {
+    const openSimulation = (tool: string, message: string, anchor?: string) => {
       setActiveModule("simulation");
       setActiveTool(tool);
       setStatus(message);
+      if (anchor) window.setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
     };
     switch (action) {
       case "new-project": onNewProject(); break;
-      case "open-project": case "project": case "history": case "profiles": openSimulation("simulation-run", "Projetos, histórico e Profiles disponíveis no painel do Simulation Lab"); break;
-      case "simple": openSimulation("simulation-simple", "Simple Macro selecionado"); break;
-      case "economy-zero": openSimulation("simulation-run", "Economy Zero selecionado"); break;
-      case "advanced": openSimulation("simulation-run", "Configuração Hybrid / Advanced aberta"); break;
-      case "batch": openSimulation("simulation-batch", "Experimentos em lote selecionados"); break;
+      case "open-project": case "project": openSimulation("simulation-run", "Projetos locais", "economy-zero-projects"); break;
+      case "history": openSimulation("simulation-run", "Histórico local de execuções", "economy-zero-projects"); break;
+      case "profiles": openSimulation("simulation-run", "Profiles dos motores", "economy-zero-profiles"); break;
+      case "simple": setSimulationLevel("simple"); openSimulation("simulation-simple", "Simple Macro selecionado"); break;
+      case "economy-zero": setSimulationLevel("economy-zero"); openSimulation("simulation-run", "Economy Zero selecionado"); break;
+      case "advanced": setSimulationLevel("advanced"); openSimulation("simulation-run", "Configuração Hybrid / Advanced aberta"); break;
+      case "batch": openSimulation("simulation-batch", "Experimentos em lote selecionados", "economy-zero-batch"); break;
       case "shocks": case "presets": openSimulation("simulation-run", "Configuração de cenários aberta"); break;
-      case "simulation": case "results": openSimulation("simulation-run", "Simulation Lab selecionado"); break;
+      case "simulation": openSimulation("simulation-run", "Simulation Lab selecionado"); break;
+      case "results": openSimulation("simulation-run", "Resultados da simulação", "economy-zero-results"); break;
       case "replay": openSimulation("simulation-replay", "Manifestos e reprodutibilidade selecionados"); break;
       case "scenario-ai": setActiveModule("scenario-ai"); setActiveTool("scenario-compiler"); setStatus("Compilador de cenário selecionado"); break;
       case "dynare": case "minsky": case "mesa": case "hark": setActiveModule(action); setStatus(`${action.toUpperCase()} Lab selecionado`); break;
       case "validation": setActiveModule("validation"); setStatus("Diagnóstico de motores selecionado"); break;
       case "data": case "calibration": setActiveModule("data-calibration"); setStatus("Dados e calibração selecionados"); break;
       case "help": setStatus("Consulte README.md e a pasta docs incluídos no pacote completo"); break;
-      case "about": setStatus("Economy Lab 2.13.0 · laboratório econômico local e auditável"); break;
+      case "about": setStatus("Economy Lab 2.14.0 · laboratório econômico local e auditável"); break;
       default: setStatus("Ação indisponível");
     }
-  }
+  });
 
-  function onChromeExport() {
+  const onChromeExport = useStableCallback(() => {
     if (batchResult) { void onExportBatch("xlsx"); return; }
     if (result) { void onExportSimulation("xlsx"); return; }
     setStatus("Execute uma simulação antes de exportar; no Simple Macro use os botões do painel após o primeiro ano");
-  }
+  });
 
   async function refreshProfiles() {
-    setProfiles(await listProfiles());
-    setStorage(await getStorageStatus());
+    const [profilesList, storageStatus] = await Promise.all([listProfiles(), getStorageStatus()]);
+    setProfiles(profilesList);
+    setStorage(storageStatus);
   }
 
   async function onApplyProfile(profileId: string) {
@@ -415,9 +432,10 @@ export default function App() {
     }
   }
 
-  async function onDeleteProfile(profileId: string) {
+  async function onDeleteProfile(profile: ProfileSummary) {
+    if (!window.confirm(`Excluir o Profile "${profile.name}"? Esta ação não pode ser desfeita.`)) return;
     try {
-      await deleteProfile(profileId);
+      await deleteProfile(profile.id);
       await refreshProfiles();
       setStatus("Profile excluído");
     } catch (error) {
@@ -453,6 +471,33 @@ export default function App() {
 
   const activeModuleInfo = modules.find((module) => module.id === activeModule);
 
+  function onSelectTool(id: string, title: string) {
+    setActiveTool(id);
+    if (id === "simulation-simple") setSimulationLevel("simple");
+    else if (activeModule === "simulation") setSimulationLevel(current => current === "simple" ? "economy-zero" : current);
+    setStatus(`${title} selecionada`);
+
+    const anchors: Record<string, string> = {
+      "simulation-run": "economy-zero-controls",
+      "simulation-jobs": "economy-zero-job",
+      "simulation-replay": "economy-zero-projects",
+      "simulation-batch": "economy-zero-batch",
+      "simulation-charts": "economy-zero-charts",
+      "simulation-export": result ? "economy-zero-exports" : batchResult ? "economy-zero-batch-exports" : "economy-zero-results",
+    };
+    const anchor = anchors[id];
+    if (anchor) window.setTimeout(() => {
+      const target = document.getElementById(anchor) ?? document.getElementById("economy-zero-results");
+      target?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 80);
+  }
+
+  const onSelectModule = useStableCallback((id: string) => {
+    const module = modules.find(item => item.id === id);
+    setActiveModule(id);
+    setStatus(module ? `${module.title}: ${module.available ? "disponível" : "não instalado ou offline"}` : "Módulo selecionado");
+  });
+
   return (
     <DesktopChrome
       projectName={projectName}
@@ -462,12 +507,24 @@ export default function App() {
       modules={modules}
       activeModule={activeModule}
       activeModuleInfo={activeModuleInfo}
+      simulationLevel={simulationLevel}
       tools={moduleTools}
       activeTool={activeTool}
-      onModule={setActiveModule}
-      onTool={(id, title) => { setActiveTool(id); setStatus(`${title} selecionada`); }}
+      onModule={onSelectModule}
+      onTool={onSelectTool}
       onSave={() => { void onSaveProject(); }}
       onExport={onChromeExport}
+      onRun={() => {
+        if (activeModule === "simulation" && ["simulation-run", "simulation-jobs"].includes(activeTool)) void runEconomyZero();
+        else if (activeModule === "simulation" && activeTool === "simulation-batch") void onRunBatch();
+        else if (activeModule === "simulation" && activeTool === "simulation-simple") setStatus("Use “Simular ano” no painel Simple Macro para executar uma decisão anual");
+        else onChromeAction("simulation");
+      }}
+      running={jobIsActive}
+      autoOpenResults={autoOpenResults}
+      simulationTimeout={simulationTimeout}
+      onAutoOpenResults={setAutoOpenResults}
+      onSimulationTimeout={setSimulationTimeout}
       onAction={onChromeAction}
       onStatus={setStatus}
     >
@@ -475,89 +532,51 @@ export default function App() {
         activeTool === "simulation-simple" ? (
           <SimpleMacroWorkspace
             onStatus={setStatus}
-            onApplyAdvanced={(scenario) => { setSpec(scenario); setActiveTool("simulation-run"); setStatus("Cenário Simple convertido para Economy Zero"); }}
+            onApplyAdvanced={(scenario) => { setSpec(scenario); setSimulationLevel("economy-zero"); setActiveTool("simulation-run"); setStatus("Cenário Simple convertido para Economy Zero"); }}
           />
         ) : (
-      <section className="grid">
-        <form className="panel controls" onSubmit={onSubmit}>
+      <section className="grid economyZeroGrid">
+        <form className="panel controls economyZeroControls" id="economy-zero-controls" onSubmit={onSubmit}>
           <h2>Cenário</h2>
           <p className="muted topology">
             {spec.households.toLocaleString("pt-BR")} famílias · {spec.firms} empresas · {spec.banks} bancos
           </p>
 
-          <div className="projectBox">
-            <div className="projectTitle">
-              <strong>Projeto local</strong>
-              <span className="muted">SQLite · {storage?.projects ?? 0} projetos · {storage?.runs ?? 0} execuções · {storage?.experiments ?? 0} lotes · {storage?.profiles ?? 0} profiles</span>
-            </div>
-            <select value={projectId ?? ""} onChange={(e) => onOpenProject(e.target.value)}>
-              <option value="">Projeto não salvo</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.name} ({project.run_count})</option>
-              ))}
-            </select>
-            <input
-              className="numberInput"
-              value={projectName}
-              maxLength={120}
-              placeholder="Nome do projeto"
-              onChange={(e) => setProjectName(e.target.value)}
-            />
-            <textarea
-              rows={2}
-              value={projectDescription}
-              maxLength={1000}
-              placeholder="Descrição opcional"
-              onChange={(e) => setProjectDescription(e.target.value)}
-            />
-            <div className="projectActions">
-              <button type="button" onClick={onSaveProject}>{projectId ? "Salvar alterações" : "Salvar projeto"}</button>
-              <button type="button" className="secondaryButton" onClick={onNewProject}>Novo</button>
-              {projectId && <button type="button" className="dangerButton" onClick={onDeleteProject}>Excluir</button>}
-            </div>
-            {projectId && runs.length > 0 && (
-              <div className="runHistory">
-                <strong>Histórico recente</strong>
-                {runs.slice(0, 6).map((run) => (
-                  <button type="button" className="runItem" key={run.id} onClick={() => onOpenRun(run.id)}>
-                    <span>{when(run.created_at)}</span>
-                    <span>PIB {run.final_gdp_index.toFixed(1)} · π {run.final_inflation.toFixed(1)}% · u {run.final_unemployment.toFixed(1)}%</span>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="executionPresetBar">
+            <div><strong>Escala de execução</strong><small>Use a escala rápida para conferir o cenário antes da rodada completa.</small></div>
+            <div className="projectActions"><button type="button" className="secondaryButton" disabled={jobIsActive} onClick={() => { setSpec({ ...spec, households: 300, firms: 15, banks: 3, months: 12 }); setStatus("Escala rápida aplicada: 300 famílias, 15 empresas e 12 meses"); }}>Teste rápido</button><button type="button" className="secondaryButton" disabled={jobIsActive} onClick={() => { setSpec({ ...spec, households: 5000, firms: 100, banks: 3, months: 24 }); setStatus("Escala padrão restaurada"); }}>Escala padrão</button></div>
           </div>
 
-          <div className="profileBox">
-            <div className="projectTitle">
-              <strong>Motores e Profiles</strong>
-              <span className="muted">Basic funciona sem software externo; Profiles trazem configurações dos laboratórios.</span>
-            </div>
-            <div className="presetGrid">
-              {presets.map((preset) => (
-                <button type="button" className="secondaryButton" key={preset.id} onClick={() => onApplyPreset(preset.id)} title={preset.description}>
-                  {preset.title}
-                </button>
-              ))}
-            </div>
-            {Object.keys(spec.applied_profiles ?? {}).length > 0 && (
-              <div className="profileChips">
-                {Object.entries(spec.applied_profiles).map(([kind, id]) => { const p = profiles.find(item => item.id === id); return <span key={kind}>{kind}: {p?.name ?? id.slice(0, 8)}</span>; })}
-              </div>
-            )}
-            {profiles.length > 0 ? (
-              <div className="profileList">
-                {profiles.slice(0, 8).map((profile) => (
-                  <div className="profileItem" key={profile.id}>
-                    <div><strong>{profile.name}</strong><small>{profile.module_id} · {profile.kind} · {profile.compatibility}</small></div>
-                    <div className="projectActions"><button type="button" onClick={() => onApplyProfile(profile.id)}>Aplicar</button><button type="button" className="dangerButton" onClick={() => onDeleteProfile(profile.id)}>Excluir</button></div>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="muted">Nenhum Profile salvo ainda. Abra Dynare, Mesa, HARK ou Minsky Lab e use “Salvar e enviar”.</p>}
-          </div>
+          <ProjectPanel
+            storage={storage}
+            projectId={projectId}
+            projects={projects}
+            projectName={projectName}
+            projectDescription={projectDescription}
+            runs={runs}
+            disabled={jobIsActive || monitoringJob}
+            onOpenProject={onOpenProject}
+            onProjectNameChange={setProjectName}
+            onProjectDescriptionChange={setProjectDescription}
+            onSaveProject={onSaveProject}
+            onNewProject={onNewProject}
+            onDeleteProject={onDeleteProject}
+            onOpenRun={onOpenRun}
+            formatDate={when}
+          />
 
-          <div className="batchBox">
+          {missingEngines.length > 0 && <div className="engineRequirement" role="alert"><strong>Motores necessários: {missingEngines.join(", ")}</strong><p>O cenário mantém suas escolhas, mas esses motores ainda não estão disponíveis.</p><button type="button" onClick={() => window.dispatchEvent(new Event("economy-lab-open-engines"))}>Instalar / configurar motores</button><button type="button" className="secondaryButton" onClick={() => { void onApplyPreset("basic"); setSimulationError(""); }}>Aplicar Basic (motores nativos)</button></div>}
+          <ProfilePanel
+            presets={presets}
+            availableEngines={availableEngines}
+            profiles={profiles}
+            appliedProfiles={spec.applied_profiles}
+            onApplyPreset={onApplyPreset}
+            onApplyProfile={onApplyProfile}
+            onDeleteProfile={onDeleteProfile}
+          />
+
+          <div className="batchBox" id="economy-zero-batch">
             <div className="projectTitle">
               <strong>Experimentos em lote</strong>
               <span className="muted">Varra um parâmetro e repita com seeds diferentes</span>
@@ -935,10 +954,19 @@ export default function App() {
             />
           </label>
 
-          <button type="submit">Simular Economy Zero</button>
+          <button type="submit" disabled={jobIsActive}>{jobIsActive ? `Simulando · ${simulationJob?.progress.toFixed(0) ?? 0}%` : "Simular Economy Zero"}</button>
         </form>
 
-        <section className="panel results">
+        <section className="panel results economyZeroResults" id="economy-zero-results" ref={resultsPanelRef}>
+          <div id="economy-zero-job">
+          {simulationJob && <div className={`jobProgressCard ${simulationJob.status}`}>
+            <div className="jobProgressHeader"><div><span>EXECUÇÃO LOCAL</span><strong>{jobStageLabel(simulationJob.stage)}</strong></div><em>{simulationJob.progress.toFixed(0)}%</em></div>
+            <div className="jobProgressTrack"><i style={{ width: `${simulationJob.progress}%` }} /></div>
+            <div className="jobProgressMeta"><span>Mês {simulationJob.current_step} de {simulationJob.total_steps}</span><span>Limite: {Math.round(simulationJob.timeout_seconds / 60)} min</span><span>Job {simulationJob.id.slice(0, 8)}</span></div>
+            {jobIsActive && <button type="button" className="secondaryButton cancelJobButton" onClick={() => void onCancelSimulation()}>Cancelar simulação</button>}
+          </div>}
+          </div>
+          {simulationError && <div className="simulationError" role="alert"><div><strong>{jobIsActive ? "Consulta do progresso interrompida" : "A simulação não foi concluída"}</strong><p>{simulationError}</p></div><button type="button" className="secondaryButton" disabled={monitoringJob} onClick={() => void runEconomyZero()}>{jobIsActive ? "Reconectar à simulação" : "Tentar novamente"}</button></div>}
           {batchResult && (
             <section className="accountingBlock batchResults">
               <h3>Comparação de cenários — {batchResult.axis}</h3>
@@ -963,7 +991,7 @@ export default function App() {
                 </table>
               </div>
               <BatchBarChart data={batchResult.aggregates} title={`Comparação · ${batchResult.axis}`} />
-              <div className="exportActions">
+              <div className="exportActions" id="economy-zero-batch-exports">
                 <button type="button" onClick={() => onExportBatch("xlsx")}>Exportar Excel (.xlsx)</button>
                 <button type="button" className="secondaryButton" onClick={() => onExportBatch("csv")}>Exportar CSV</button>
               </div>
@@ -973,7 +1001,7 @@ export default function App() {
 
           <h2>Resultado</h2>
           {!result ? (
-            <p className="muted">Execute um cenário para iniciar a economia multiagente.</p>
+            <div className="economyZeroEmpty"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 16h10"/></svg><div><strong>{jobIsActive ? "Simulação em andamento" : "Pronto para executar o Economy Zero"}</strong><p>{jobIsActive ? "Acompanhe o progresso acima. A interface permanece disponível enquanto o backend calcula cada mês." : "Revise os parâmetros à esquerda ou aplique “Teste rápido” e clique em Simular Economy Zero."}</p></div></div>
           ) : (
             <>
               {result.engines && (
@@ -1076,10 +1104,10 @@ export default function App() {
                 </section>
               )}
 
-              <section className="visualizationBlock">
+              <section className="visualizationBlock" id="economy-zero-charts">
                 <div className="visualizationHeader">
                   <div><h3>Gráficos da simulação</h3><p className="muted">Visualizações geradas diretamente da série mensal realizada.</p></div>
-                  <div className="exportActions">
+                  <div className="exportActions" id="economy-zero-exports">
                     <button type="button" onClick={() => onExportSimulation("xlsx")}>Exportar Excel (.xlsx)</button>
                     <button type="button" className="secondaryButton" onClick={() => onExportSimulation("csv")}>Exportar CSV</button>
                   </div>
@@ -1297,10 +1325,11 @@ export default function App() {
                     : "Sem Minsky ao vivo: ainda é possível exportar o snapshot Godley v1.0 em JSON."}
                 </p>
                 <button type="button" onClick={async () => {
-                  const payload = await exportMinsky(spec);
+                  const exportSpec = resultScenario ?? spec;
+                  const payload = await exportMinsky(exportSpec);
                   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
                   const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a"); a.href = url; a.download = `economy-lab-minsky-${spec.seed}.json`; a.click();
+                  const a = document.createElement("a"); a.href = url; a.download = `economy-lab-minsky-${exportSpec.seed}.json`; a.click();
                   URL.revokeObjectURL(url);
                 }}>Exportar Godley para Minsky</button>
               </section>
@@ -1323,9 +1352,9 @@ export default function App() {
       ) : activeModuleInfo?.id === "validation" ? (
         <ValidationWorkspace module={activeModuleInfo} onOpenSimulation={() => setActiveModule("simulation")} />
       ) : activeModuleInfo?.id === "data-calibration" ? (
-        <DataCalibrationWorkspace module={activeModuleInfo} scenario={spec} result={result} onApplyScenario={setSpec} onOpenSimulation={() => setActiveModule("simulation")} />
+        <DataCalibrationWorkspace module={activeModuleInfo} scenario={resultScenario ?? spec} result={result} onApplyScenario={(next) => { setSpec(next); setResult(null); setResultScenario(null); }} onOpenSimulation={() => setActiveModule("simulation")} />
       ) : activeModuleInfo?.id === "scenario-ai" ? (
-        <ModelBuilderWorkspace module={activeModuleInfo} selectedTool={activeTool} onApplyScenario={setSpec} onOpenSimulation={() => setActiveModule("simulation")} />
+        <ModelBuilderWorkspace module={activeModuleInfo} selectedTool={activeTool} onApplyScenario={(next) => { setSpec(next); setResult(null); setResultScenario(null); }} onOpenSimulation={() => setActiveModule("simulation")} />
       ) : activeModuleInfo && ["dynare", "minsky", "mesa", "hark"].includes(activeModuleInfo.id) ? (
         <LabWorkspace
           module={activeModuleInfo}

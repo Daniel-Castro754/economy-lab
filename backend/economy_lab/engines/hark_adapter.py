@@ -210,7 +210,7 @@ class HarkConsumptionPolicy:
         if not hark_available():
             raise EngineUnavailableError(
                 "HARK foi solicitado, mas o pacote econ-ark/HARK não está instalado. "
-                'Instale as dependências de simulação com: pip install -e ".[simulation]"'
+                'Abra Configurações → Motores e instale Mesa e HARK; depois reabra o aplicativo.'
             )
 
     def _discount_factor(self, patience_bucket: int) -> float:
@@ -262,7 +262,10 @@ class HarkConsumptionPolicy:
             BoroCnstArt=0.0,
             CubicBool=False,
             vFuncBool=False,
-            quiet=True,
+            # HARK 0.17.2 skips required condition initialization with quiet=True.
+            # Keep the preparation enabled and suppress logging with verbose instead.
+            quiet=False,
+            verbose=False,
             seed=group_bucket * 10 + patience_bucket,
         )
         consumer.solve()

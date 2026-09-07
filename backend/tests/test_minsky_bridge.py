@@ -1,5 +1,8 @@
+import pytest
+
 from economy_lab.core.schemas import ScenarioSpec
 from economy_lab.engines.minsky_adapter import MinskyRestClient, MinskyTemplateBridge, bridge_status
+import economy_lab.engines.minsky_adapter as minsky_adapter
 from economy_lab.abm.economy_zero import EconomyZeroConfig, EconomyZeroModel
 from economy_lab.engines.minsky_adapter import build_godley_export
 
@@ -43,6 +46,71 @@ def test_bridge_status_without_configuration(monkeypatch):
     status = bridge_status()
     assert not status.configured
     assert not status.reachable
+
+
+@pytest.mark.parametrize(
+    ("base_url", "normalized_url"),
+    [
+        ("http://localhost.:8000/", "http://localhost.:8000"),
+        ("http://127.0.0.1:8000/api/", "http://127.0.0.1:8000/api/"),
+        ("http://[::1]:8000/", "http://[::1]:8000"),
+        ("https://minsky.example.test/api/", "https://minsky.example.test/api/"),
+        ("https://localhost:8000/", "https://localhost:8000"),
+    ],
+)
+def test_client_accepts_safe_rest_urls_without_network(base_url, normalized_url):
+    client = MinskyRestClient(base_url=base_url)
+    assert client.base_url == normalized_url
+    assert client._url("/minsky/@type") == f"{normalized_url.rstrip('/')}/minsky/@type"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "ftp://localhost:8000",
+        "http://minsky.example.test:8000",
+        "http://192.0.2.1:8000",
+        "http://user:secret@localhost:8000",
+        "https://minsky.example.test?token=secret",
+        "https://minsky.example.test?",
+        "https://minsky.example.test/#fragment",
+        "https://minsky.example.test/#",
+        "https:///minsky",
+        "https://[::1",
+    ],
+)
+def test_client_rejects_unsafe_or_malformed_rest_urls_without_leaking_values(base_url):
+    with pytest.raises(ValueError) as exc_info:
+        MinskyRestClient(base_url=base_url)
+    assert base_url not in str(exc_info.value)
+    assert "secret" not in str(exc_info.value)
+
+
+def test_client_validates_environment_rest_url_without_network(monkeypatch):
+    monkeypatch.setenv("MINSKY_REST_URL", "http://minsky.example.test:8000")
+    with pytest.raises(ValueError, match="HTTPS for non-loopback hosts"):
+        MinskyRestClient()
+
+
+def test_client_rejects_oversized_rest_response(monkeypatch):
+    class FakeResponse:
+        headers: dict[str, str] = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def read(self, _limit: int) -> bytes:
+            return b"12345"
+
+    monkeypatch.setattr(minsky_adapter, "_MAX_REST_RESPONSE_BYTES", 4)
+    monkeypatch.setattr(minsky_adapter.request, "urlopen", lambda *_args, **_kwargs: FakeResponse())
+    client = MinskyRestClient(base_url="http://127.0.0.1:8000")
+
+    with pytest.raises(ValueError, match="exceeds the allowed size"):
+        client.get("/minsky/@type")
 
 
 def test_godley_export_has_json_and_csv():

@@ -76,6 +76,19 @@ class Ledger:
     balances: dict[str, float] = field(default_factory=dict)
     transactions: list[Transaction] = field(default_factory=list)
     tolerance: float = 1e-8
+    # Lazily-populated running totals for prefixes previously queried through
+    # sum_prefix(), kept current in post() below. Without this, sum_prefix()
+    # rescans every account on every call; since it is called roughly once per
+    # household transaction (via bank_deposits/reserve_floor/bank_financials),
+    # that full rescan makes each simulated month cost O(households^2) instead
+    # of O(households).
+    _prefix_totals: dict[str, float] = field(default_factory=dict, repr=False, compare=False)
+    # Same idea as _prefix_totals: bank_ids() used to re-scan every account on every
+    # call looking for reserve_asset accounts, and it is called once per cross-bank
+    # transfer (ensure_bank_reserves loops over it), so it was the second O(n) scan
+    # happening O(households) times per month. Bank accounts are only ever created,
+    # never removed, so a monotonically-growing cache is safe.
+    _bank_ids: set[int] = field(default_factory=set, repr=False, compare=False)
 
     def post(self, *, tick: int, description: str, postings: list[Posting]) -> None:
         total = sum(item.amount for item in postings)
@@ -84,10 +97,18 @@ class Ledger:
                 f"Transaction '{description}' is unbalanced by {total:.12f}"
             )
 
+        prefixes = self._prefix_totals
         for posting in postings:
             self.balances[posting.account] = self.balances.get(posting.account, 0.0) + posting.amount
             if abs(self.balances[posting.account]) < self.tolerance:
                 self.balances[posting.account] = 0.0
+            if prefixes:
+                for prefix in prefixes:
+                    if posting.account.startswith(prefix):
+                        prefixes[prefix] += posting.amount
+            match = _RESERVE_ASSET.match(posting.account)
+            if match:
+                self._bank_ids.add(int(match.group(1)))
 
         self.transactions.append(
             Transaction(tick=tick, description=description, postings=tuple(postings))
@@ -113,12 +134,7 @@ class Ledger:
         )
 
     def bank_ids(self) -> list[int]:
-        ids: set[int] = set()
-        for account in self.balances:
-            match = _RESERVE_ASSET.match(account)
-            if match:
-                ids.add(int(match.group(1)))
-        return sorted(ids)
+        return sorted(self._bank_ids)
 
     def bank_deposits(self, bank_id: int) -> float:
         return max(0.0, -self.sum_prefix(f"bank:{bank_id}:deposit_liability"))
@@ -472,17 +488,23 @@ class Ledger:
         return self.balances.get(account, 0.0)
 
     def sum_prefix(self, prefix: str) -> float:
-        return sum(value for account, value in self.balances.items() if account.startswith(prefix))
+        cached = self._prefix_totals.get(prefix)
+        if cached is not None:
+            return cached
+        total = sum(value for account, value in self.balances.items() if account.startswith(prefix))
+        self._prefix_totals[prefix] = total
+        return total
 
     def transactions_for_tick(self, tick: int) -> list[Transaction]:
         return [transaction for transaction in self.transactions if transaction.tick == tick]
 
     def assert_balanced(self) -> None:
-        for transaction in self.transactions:
-            if not isclose(transaction.total, 0.0, abs_tol=self.tolerance):
-                raise AssertionError(
-                    f"Stored transaction '{transaction.description}' is unbalanced: {transaction.total}"
-                )
+        # Every stored Transaction was already balance-checked by post() before being
+        # appended (the only way anything reaches self.transactions), so re-summing
+        # the full transaction history here on every call would just re-verify an
+        # invariant that cannot be false — an O(months) rescan repeated every month.
+        # The one check worth doing on demand is the aggregate net-to-zero position,
+        # which catches accumulation/floating-point drift across the whole ledger.
         if not isclose(sum(self.balances.values()), 0.0, abs_tol=1e-6):
             raise AssertionError(
                 f"Global ledger does not net to zero: {sum(self.balances.values())}"

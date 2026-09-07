@@ -117,6 +117,8 @@ fn wait_until_stopped(port: u16, timeout: Duration) -> bool {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             backend_api_base,
             backend_runtime_status
@@ -126,6 +128,7 @@ pub fn run() {
             let api_base = format!("http://127.0.0.1:{port}");
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
+            let runtime_resources = app.path().resource_dir()?.join("runtime-tools");
             let instance_id = nonce("economy-lab");
             let shutdown_token = nonce("shutdown");
 
@@ -143,6 +146,7 @@ pub fn run() {
                 .and_then(|command| {
                     command
                         .args(sidecar_args)
+                        .env("ECONOMY_LAB_RUNTIME_RESOURCES", runtime_resources.to_string_lossy().to_string())
                         .env("ECONOMY_LAB_RUNTIME_MODE", "desktop-sidecar")
                         .env("ECONOMY_LAB_RUNTIME_INSTANCE", &instance_id)
                         .env("ECONOMY_LAB_SHUTDOWN_TOKEN", &shutdown_token)

@@ -1,0 +1,19 @@
+{
+  "commit": "287318262390c5af66e5e07c07652a3d670f7158",
+  "run_id": 34007378813,
+  "job_id": 101416975779,
+  "backend_tests": {
+    "passed": 252,
+    "skipped": 2,
+    "failures": 0
+  },
+  "packaged_backend": {
+    "version": "2.13.2",
+    "scenarios": 3,
+    "months": 12,
+    "persisted_runs": 1,
+    "accounting_balanced": true,
+    "xlsx_bytes": 17550
+  },
+  "installer_artifact_id": 9981499570
+}

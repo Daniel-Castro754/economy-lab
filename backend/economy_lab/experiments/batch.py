@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from statistics import mean, pstdev
 from time import perf_counter
 from typing import Iterable
@@ -22,6 +24,39 @@ def _scenario_for(base: ScenarioSpec, axis: str, value: float, seed: int) -> Sce
         return ScenarioSpec.model_validate({**base.model_dump(mode="python"), axis: value, "seed": seed})
     except ValidationError as exc:
         raise ValueError(f"Invalid value {value!r} for batch axis {axis}: {exc}") from exc
+
+
+def _run_batch_point(spec: ScenarioSpec, axis_value: float, repetition: int, seed: int) -> BatchRunPoint:
+    """Run one (axis value, repetition) scenario. Module-level so it can be pickled to a worker process."""
+    run_started = perf_counter()
+    result = run_simulation(spec)
+    run_ms = (perf_counter() - run_started) * 1000.0
+    s = result.summary
+    return BatchRunPoint(
+        axis_value=axis_value, repetition=repetition, seed=seed, duration_ms=run_ms,
+        final_gdp_index=s.final_gdp_index, final_inflation=s.final_inflation,
+        final_unemployment=s.final_unemployment, cumulative_defaults=s.cumulative_defaults,
+        final_bank_credit=s.final_bank_credit, final_bank_capital_ratio=s.final_bank_capital_ratio,
+        cumulative_credit_rationed=s.cumulative_credit_rationed,
+        ledger_balanced=s.ledger_balanced, godley_stocks_balanced=s.godley_stocks_balanced,
+        godley_flows_balanced=s.godley_flows_balanced,
+    )
+
+
+def _batch_worker_count(total_jobs: int) -> int:
+    """One run per available core, capped by job count and an optional override.
+
+    Each run is an independent, CPU-bound Economy Zero simulation with no shared
+    state, so batch/axis-comparison experiments are embarrassingly parallel —
+    running them one at a time in a single request left every other core idle.
+    """
+    override = os.getenv("ECONOMY_LAB_BATCH_WORKERS")
+    if override:
+        try:
+            return max(1, min(int(override), total_jobs))
+        except ValueError:
+            pass
+    return max(1, min(total_jobs, os.cpu_count() or 1))
 
 
 def _python_aggregates(points: Iterable[BatchRunPoint]) -> list[BatchAggregate]:
@@ -104,24 +139,29 @@ def _duckdb_aggregates(points: list[BatchRunPoint]) -> list[BatchAggregate] | No
 
 def run_batch_experiment(request: BatchExperimentRequest) -> BatchExperimentResponse:
     started = perf_counter()
-    points: list[BatchRunPoint] = []
+
+    # Build and validate every scenario up front (cheap, sequential) so an invalid
+    # axis value fails fast instead of after other runs have already started.
+    jobs: list[tuple[ScenarioSpec, float, int, int]] = []
     for value in request.values:
         for repetition in range(request.repetitions):
             seed = request.base.seed + repetition * request.seed_step
             spec = _scenario_for(request.base, request.axis, float(value), seed)
-            run_started = perf_counter()
-            result = run_simulation(spec)
-            run_ms = (perf_counter() - run_started) * 1000.0
-            s = result.summary
-            points.append(BatchRunPoint(
-                axis_value=float(value), repetition=repetition + 1, seed=seed, duration_ms=run_ms,
-                final_gdp_index=s.final_gdp_index, final_inflation=s.final_inflation,
-                final_unemployment=s.final_unemployment, cumulative_defaults=s.cumulative_defaults,
-                final_bank_credit=s.final_bank_credit, final_bank_capital_ratio=s.final_bank_capital_ratio,
-                cumulative_credit_rationed=s.cumulative_credit_rationed,
-                ledger_balanced=s.ledger_balanced, godley_stocks_balanced=s.godley_stocks_balanced,
-                godley_flows_balanced=s.godley_flows_balanced,
-            ))
+            jobs.append((spec, float(value), repetition + 1, seed))
+
+    points: list[BatchRunPoint] = []
+    workers = _batch_worker_count(len(jobs))
+    if workers <= 1:
+        for spec, axis_value, repetition, seed in jobs:
+            points.append(_run_batch_point(spec, axis_value, repetition, seed))
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(_run_batch_point, spec, axis_value, repetition, seed)
+                for spec, axis_value, repetition, seed in jobs
+            ]
+            points.extend(future.result() for future in futures)
+
     aggregates = _duckdb_aggregates(points)
     analytics_engine = "duckdb" if aggregates is not None else "python-statistics"
     if aggregates is None:

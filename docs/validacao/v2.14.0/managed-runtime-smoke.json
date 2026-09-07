@@ -1,0 +1,12 @@
+{
+  "version": "2.14.0",
+  "nsis_installed": true,
+  "bootstrap_without_system_python": true,
+  "mesa": true,
+  "hark": true,
+  "managed_restart": true,
+  "user_path": true,
+  "pip_targets_managed_environment": true,
+  "economy_zero": "completed",
+  "ledger_balanced": true
+}

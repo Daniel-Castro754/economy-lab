@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   convertSimpleToAdvanced,
   exportSimpleFile,
@@ -58,6 +58,8 @@ function MiniTrend({ years }: { years: SimpleYearResult[] }) {
     </svg></div>;
 }
 
+type SimpleOperation = "reset" | "run" | "export" | "promote" | null;
+
 export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdvanced: (scenario: ScenarioSpec) => void; onStatus: (message: string) => void }) {
   const [scenarios, setScenarios] = useState<SimpleScenarioInfo[]>([]);
   const [config, setConfig] = useState<SimpleInitialConfig | null>(null);
@@ -69,6 +71,21 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
   const [warning, setWarning] = useState("");
   const [scenarioError, setScenarioError] = useState("");
   const [resultTab, setResultTab] = useState<(typeof resultTabs)[number][0]>("visao");
+  const [operation, setOperation] = useState<SimpleOperation>(null);
+  const operationRef = useRef<SimpleOperation>(null);
+  const isOperating = operation !== null;
+
+  function beginOperation(next: Exclude<SimpleOperation, null>) {
+    if (operationRef.current) return false;
+    operationRef.current = next;
+    setOperation(next);
+    return true;
+  }
+
+  function finishOperation() {
+    operationRef.current = null;
+    setOperation(null);
+  }
 
   async function loadScenarios() {
     setScenarioError("");
@@ -86,6 +103,7 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
   useEffect(() => { void reset("baseline"); }, []);
 
   async function reset(scenarioId: "baseline" | "global_recession" | "volatile") {
+    if (!beginOperation("reset")) return;
     onStatus("Preparando simulação simples…");
     try {
       const started = await startSimple({ ...defaultConfig, scenario_id: scenarioId });
@@ -96,17 +114,20 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
       const message = e instanceof Error ? e.message : "Falha ao iniciar modo simples";
       setScenarioError(message);
       onStatus(message);
+    } finally {
+      finishOperation();
     }
   }
 
   async function runYear() {
-    if (!config || !state || state.year >= 7) return;
+    if (!config || !state || state.year >= 7 || !beginOperation("run")) return;
     onStatus(`Simulando ano ${state.year + 1}…`);
     try {
       const response = await stepSimple(config, state, decision);
       setState(response.result.state); setYears(current => [...current, response.result]); setNextExternal(response.next_external ?? null);
       onStatus(response.completed ? "Ciclo de 7 anos concluído" : `Ano ${response.result.year} concluído`);
     } catch (e) { onStatus(e instanceof Error ? e.message : "Falha no turno simples"); }
+    finally { finishOperation(); }
   }
 
   const runResult: SimpleRunResult | null = useMemo(() => config && state && initialState ? {
@@ -115,12 +136,28 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
     years, final_state: state, completed_years: years.length,
   } : null, [config, state, initialState, years, warning]);
 
-  async function exportFile(format: "csv" | "xlsx") { if (runResult) await exportSimpleFile(format, runResult); }
+  async function exportFile(format: "csv" | "xlsx") {
+    if (!runResult || !beginOperation("export")) return;
+    try {
+      await exportSimpleFile(format, runResult);
+      onStatus(`Exportação ${format.toUpperCase()} concluída`);
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : "Falha ao exportar resultado do Simple Macro");
+    } finally {
+      finishOperation();
+    }
+  }
   async function promote() {
-    if (!config || !state) return;
-    const converted = await convertSimpleToAdvanced(config, state, decision, 24);
-    onApplyAdvanced(converted.scenario);
-    onStatus(`Cenário transferido para Economy Zero. ${converted.limitations.length} limitações de conversão registradas.`);
+    if (!config || !state || !beginOperation("promote")) return;
+    try {
+      const converted = await convertSimpleToAdvanced(config, state, decision, 24);
+      onApplyAdvanced(converted.scenario);
+      onStatus(`Cenário transferido para Economy Zero. ${converted.limitations.length} limitações de conversão registradas.`);
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : "Falha ao transferir cenário para Economy Zero");
+    } finally {
+      finishOperation();
+    }
   }
 
   const latest = years.at(-1);
@@ -135,12 +172,12 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
         <div className="controlBody">
           <div className="fieldHeading"><span>Cenário externo</span><small>Condições globais para os 7 anos</small></div>
           <div className="scenarioPicker" role="radiogroup" aria-label="Cenário externo">
-            {scenarios.map(s => <button type="button" role="radio" aria-checked={config?.scenario_id === s.id} key={s.id} className={config?.scenario_id === s.id ? "scenarioChoice active" : "scenarioChoice"} onClick={() => void reset(s.id as "baseline" | "global_recession" | "volatile")}>
+            {scenarios.map(s => <button type="button" role="radio" aria-checked={config?.scenario_id === s.id} key={s.id} className={config?.scenario_id === s.id ? "scenarioChoice active" : "scenarioChoice"} onClick={() => void reset(s.id as "baseline" | "global_recession" | "volatile")} disabled={isOperating}>
               <span>{scenarioMeta[s.id]?.eyebrow ?? "CENÁRIO"}</span><strong>{s.title}</strong><small>{scenarioMeta[s.id]?.accent ?? "Externo"}</small>
             </button>)}
             {!scenarios.length && <div className="scenarioSkeleton">Carregando cenários externos…</div>}
           </div>
-          {scenarioError && <div className="inlineError"><span>{scenarioError}</span><button type="button" className="secondaryButton" onClick={() => { void loadScenarios(); void reset(config?.scenario_id ?? "baseline"); }}>Tentar novamente</button></div>}
+          {scenarioError && <div className="inlineError"><span>{scenarioError}</span><button type="button" className="secondaryButton" onClick={() => { void loadScenarios(); void reset(config?.scenario_id ?? "baseline"); }} disabled={isOperating}>Tentar novamente</button></div>}
           <p className="muted compactHelp">{scenarioInfo?.description}</p>
 
           <div className="externalCard">
@@ -156,7 +193,7 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
             <label>Imposto corporativo<input className="numberInput" type="number" step="1" value={decision.corporate_tax} onChange={e => setDecision({...decision, corporate_tax:Number(e.target.value)})}/><small>% lucro</small></label>
             <label className="wideField">Gasto público<input className="numberInput" type="number" step="0.5" value={decision.government_spending} onChange={e => setDecision({...decision, government_spending:Number(e.target.value)})}/><small>% do PIB</small></label>
           </div></div>
-          <div className="simpleActions stickyActions"><button type="button" className="runSimulationButton" onClick={runYear} disabled={!state || state.year >= 7}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 6 9 6-9 6z"/></svg>{state?.year === 7 ? "7 anos concluídos" : `Simular ano ${(state?.year ?? 0)+1}`}</button><button type="button" className="secondaryButton" onClick={() => void reset(config?.scenario_id ?? "baseline")} title="Reiniciar simulação" aria-label="Reiniciar simulação"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div>
+          <div className="simpleActions stickyActions"><button type="button" className="runSimulationButton" onClick={runYear} disabled={!state || state.year >= 7 || isOperating}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 6 9 6-9 6z"/></svg>{state?.year === 7 ? "7 anos concluídos" : `Simular ano ${(state?.year ?? 0)+1}`}</button><button type="button" className="secondaryButton" onClick={() => void reset(config?.scenario_id ?? "baseline")} disabled={isOperating} title="Reiniciar simulação" aria-label="Reiniciar simulação"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div>
           <small className="muted">Execução local, determinística e registrada no histórico da sessão.</small>
         </div>
       </div>
@@ -170,7 +207,7 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
             {(resultTab === "monetario" || resultTab === "visao" || resultTab === "series") && <div><small>Inflação</small><strong>{pct(state.inflation)}</strong></div>}
             {(resultTab === "visao" || resultTab === "series") && <div><small>Desemprego</small><strong>{pct(state.unemployment)}</strong></div>}
           </div>}
-          {unavailableHere && <div className="levelNotice"><strong>Detalhamento disponível no Economy Zero e Hybrid/Advanced</strong><p>O Simple Macro não simula agentes, bancos ou matrizes SFC. Promova o cenário para acessar esses resultados sem inventar dados nesta tela.</p><button type="button" onClick={() => void promote()}>Enviar ao Economy Zero</button></div>}
+          {unavailableHere && <div className="levelNotice"><strong>Detalhamento disponível no Economy Zero e Hybrid/Advanced</strong><p>O Simple Macro não simula agentes, bancos ou matrizes SFC. Promova o cenário para acessar esses resultados sem inventar dados nesta tela.</p><button type="button" onClick={() => void promote()} disabled={isOperating}>Enviar ao Economy Zero</button></div>}
           {resultTab === "comparacoes" && <div className="levelNotice"><strong>Compare após gerar mais de uma execução</strong><p>Use o histórico local e os experimentos em lote no Economy Zero para comparar seeds e parâmetros.</p></div>}
           {resultTab === "auditoria" && <div className="auditSummary"><span className="ledgerState ok">✓ Simple Macro consistente</span><p>{warning}</p><p className="muted">Sem Ledger/Godley neste nível. A auditoria SFC completa é aplicada nos níveis 2 e 3.</p></div>}
           {hasMacroDetail && <>
@@ -179,7 +216,7 @@ export function SimpleMacroWorkspace({ onApplyAdvanced, onStatus }: { onApplyAdv
             {latest && resultTab === "visao" && <div className="resultNarrative"><div className="explainBox"><strong>Leitura do resultado</strong>{latest.explanation.map((x,i)=><p key={i}>{x}</p>)}</div><div className="simpleAlerts"><strong>Alertas econômicos</strong>{latest.warnings.length ? latest.warnings.map((x,i)=><p className="warning" key={`w${i}`}>{x}</p>) : <p className="muted">Nenhum alerta crítico neste ano.</p>}</div></div>}
           </>}
           {years.length > 0 && ["visao","series","fiscal","monetario"].includes(resultTab) && <div className="tableWrap simpleHistory"><table><thead><tr><th>Ano</th><th>PIB</th><th>Inflação</th><th>Desemprego</th><th>Déficit</th><th>Dívida</th><th>Aprovação</th></tr></thead><tbody>{years.map(y => <tr key={y.year}><td>{y.year}</td><td>{pct(y.state.real_gdp_growth)}</td><td>{pct(y.state.inflation)}</td><td>{pct(y.state.unemployment)}</td><td>{pct(y.state.budget_deficit_to_gdp)}</td><td>{pct(y.state.debt_to_gdp)}</td><td>{y.state.approval.toFixed(0)}</td></tr>)}</tbody></table></div>}
-          {years.length > 0 && <div className="projectActions simpleExportActions"><button type="button" className="secondaryButton" onClick={() => void exportFile("csv")}>Exportar CSV</button><button type="button" className="secondaryButton" onClick={() => void exportFile("xlsx")}>Exportar Excel</button><button type="button" onClick={() => void promote()}>Enviar cenário ao Economy Zero</button></div>}
+          {years.length > 0 && <div className="projectActions simpleExportActions"><button type="button" className="secondaryButton" onClick={() => void exportFile("csv")} disabled={isOperating}>Exportar CSV</button><button type="button" className="secondaryButton" onClick={() => void exportFile("xlsx")} disabled={isOperating}>Exportar Excel</button><button type="button" onClick={() => void promote()} disabled={isOperating}>Enviar cenário ao Economy Zero</button></div>}
         </div>
       </div>
     </div>

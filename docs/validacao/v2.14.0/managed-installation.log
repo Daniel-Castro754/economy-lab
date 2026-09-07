@@ -1,0 +1,111 @@
+Downloading cpython-3.12.11-windows-x86_64-none (download) (20.7MiB)
+ Downloading cpython-3.12.11-windows-x86_64-none (download)
+Using CPython 3.12.11
+Creating virtual environment with seed packages at: C:\Users\runneradmin\AppData\Local\Temp\Economy Lab installed test yhsdbvlq\User data\runtime\environments\2.14.0-7877aa1939dd
+ + pip==26.2.1
+Activate with: & "C:\Users\runneradmin\AppData\Local\Temp\Economy Lab installed test yhsdbvlq\User data\runtime\environments\2.14.0-7877aa1939dd\Scripts\activate"
+Using Python 3.12.11 environment at: C:\Users\runneradmin\AppData\Local\Temp\Economy Lab installed test yhsdbvlq\User data\runtime\environments\2.14.0-7877aa1939dd
+Resolved 64 packages in 680ms
+Downloading xarray (1.4MiB)
+Downloading networkx (2.0MiB)
+Downloading pydantic-core (1.9MiB)
+Downloading pillow (6.9MiB)
+Downloading sympy (6.0MiB)
+Downloading pandas (9.4MiB)
+Downloading matplotlib (8.9MiB)
+Downloading statsmodels (10.8MiB)
+Downloading fonttools (2.4MiB)
+Downloading sqlalchemy (2.1MiB)
+Downloading plotly (8.6MiB)
+Downloading llvmlite (39.9MiB)
+Downloading numba (2.7MiB)
+Downloading scipy (35.0MiB)
+Downloading numpy (12.0MiB)
+Downloading econ-ark (2.2MiB)
+ Downloading xarray
+ Downloading pydantic-core
+ Downloading sqlalchemy
+ Downloading econ-ark
+ Downloading fonttools
+ Downloading networkx
+ Downloading numba
+ Downloading pillow
+ Downloading pandas
+ Downloading sympy
+ Downloading matplotlib
+ Downloading plotly
+ Downloading numpy
+ Downloading llvmlite
+ Downloading statsmodels
+ Downloading scipy
+Prepared 64 packages in 13.11s
+Installed 64 packages in 20.02s
+ + annotated-doc==0.0.5
+ + annotated-types==0.8.0
+ + anyio==4.15.1
+ + certifi==2026.7.22
+ + charset-normalizer==3.5.1
+ + click==8.5.0
+ + cloudpickle==3.1.2
+ + colorama==0.4.6
+ + contourpy==1.3.3
+ + cycler==0.12.1
+ + econ-ark==0.17.2
+ + economy-lab==2.14.0 (from file:///C:/Users/RUNNER~1/AppData/Local/Temp/Economy%20Lab%20installed%20test%20yhsdbvlq/Application/runtime-tools/economy_lab-2.14.0-py3-none-any.whl)
+ + fastapi==0.141.1
+ + fonttools==4.64.0
+ + formulaic==1.2.2
+ + greenlet==3.5.5
+ + h11==0.16.0
+ + httptools==0.8.0
+ + idna==3.19
+ + interface-meta==2.0.1
+ + interpolation==2.2.7
+ + joblib==1.6.0
+ + kiwisolver==1.5.1
+ + llvmlite==0.49.0
+ + matplotlib==3.11.1
+ + mesa==3.5.1
+ + mpmath==1.3.0
+ + narwhals==2.25.0
+ + networkx==3.6.1
+ + numba==0.67.0
+ + numpy==2.5.3
+ + optimagic==0.5.4
+ + packaging==26.3
+ + pandas==3.0.5
+ + patsy==1.0.3
+ + pillow==12.3.0
+ + plotly==7.0.0
+ + pybaum==0.1.3
+ + pydantic==2.13.5
+ + pydantic-core==2.46.5
+ + pyparsing==3.3.2
+ + python-dateutil==2.9.0.post0
+ + python-dotenv==1.2.3
+ + pyyaml==6.0.3
+ + quantecon==0.11.4
+ + requests==2.34.2
+ + scipy==1.18.1
+ + seaborn==0.13.2
+ + sequence-jacobian==1.0.0
+ + six==1.17.0
+ + sqlalchemy==2.0.52
+ + starlette==1.6.0
+ + statsmodels==0.15.0
+ + sympy==1.14.0
+ + tqdm==4.70.0
+ + typing-extensions==4.16.0
+ + typing-inspection==0.4.4
+ + tzdata==2026.3
+ + urllib3==2.7.0
+ + uvicorn==0.52.4
+ + watchfiles==1.2.0
+ + websockets==17.1
+ + wrapt==2.4.0
+ + xarray==2026.7.0
+C:\Users\runneradmin\AppData\Local\Temp\Economy Lab installed test yhsdbvlq\User data\runtime\environments\2.14.0-7877aa1939dd\Lib\site-packages\mesa\mesa_logging.py:112: FutureWarning: The use of the `seed` keyword argument is deprecated, use `rng` instead. No functional changes.
+  res = func(*args, **kwargs)
+C:\Users\runneradmin\AppData\Local\Temp\Economy Lab installed test yhsdbvlq\User data\runtime\environments\2.14.0-7877aa1939dd\Lib\site-packages\mesa\mesa_logging.py:112: FutureWarning: The use of the `seed` keyword argument is deprecated, use `rng` instead. No functional changes.
+  res = func(*args, **kwargs)
+{"mesa": "ok", "hark": "ok", "economy_zero": "ok", "ledger": "balanced"}
