@@ -61,6 +61,24 @@ economy_lab.main:app --reload`, then `npm install && npm run dev` in
 
 ### Windows desktop installer
 
-A local installer, `Economy Lab_2.14.0_x64-setup.exe`, is present in this working tree. It is **not signed** and must not be treated as a trusted release artifact.
+There is no prebuilt executable committed to this repository — compiled
+binaries are build output, not source, and don't belong in git history.
+Instead, the [`Desktop installer`](.github/workflows/desktop-installer.yml)
+GitHub Actions workflow builds one on a Windows runner and:
 
-The installer is built and tested on a separate Windows build branch. See docs/MOTORES-INSTALACAO-v2.14.0.md for installation instructions and docs/validacao/v2.14.0/ for validation evidence. On Windows, run `npm run verify` before `npm run desktop:build`; the latter uses the committed npm lockfiles and does not download a Tauri CLI ad hoc. These commands require the Python, Node.js and Rust/MSVC toolchain (`npm run desktop:check`). The resulting installer bundles the Python backend as a PyInstaller sidecar, so the target machine needs no Python, Node or Rust. See `docs/DESKTOP_RUNTIME.md` for the sidecar and shutdown handshake.
+- uploads it as a workflow artifact on every manual run (Actions tab →
+  *Desktop installer* → *Run workflow*), or
+- publishes it to the repository's [Releases](../../releases) page when a
+  `v*` tag is pushed.
+
+The resulting installer bundles the Python backend as a PyInstaller sidecar
+(no Python/Node/Rust needed on the target machine) and also carries the
+`uv`-based managed-runtime tooling used to install optional engines
+(Mesa/HARK) on demand from **Settings → Engines** — see
+`docs/MOTORES-INSTALACAO-v2.14.0.md` for how that works and
+`docs/validacao/v2.14.0/` for validation evidence.
+
+To build one locally on Windows: `npm run desktop:check` to verify
+prerequisites (Python 3.12, Node.js, Rust/MSVC), then `npm run verify`
+(backend tests + frontend typecheck/build) before `npm run desktop:build`.
+See `docs/DESKTOP_RUNTIME.md` for the sidecar and shutdown handshake.
