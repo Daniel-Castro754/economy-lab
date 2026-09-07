@@ -1,0 +1,48 @@
+{
+  "canonical": {
+    "schema_name": "economy-lab-godley-v1.0",
+    "tick": 1,
+    "columns": ["households", "firms", "banks", "government", "central_bank", "rest_of_world"],
+    "stocks": [
+      {
+        "instrument": "deposits",
+        "households": 100.0,
+        "firms": 0.0,
+        "banks": -100.0,
+        "government": 0.0,
+        "central_bank": 0.0,
+        "rest_of_world": 0.0,
+        "total": 0.0
+      }
+    ],
+    "flows": []
+  },
+  "template_id": "replace-with-reviewed-template-id",
+  "template_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "mappings": [
+    {
+      "kind": "stocks",
+      "instrument": "deposits",
+      "sector": "households",
+      "variable_id": ":godley_deposits_households",
+      "external_multiplier": 1.0,
+      "required": true
+    },
+    {
+      "kind": "stocks",
+      "instrument": "deposits",
+      "sector": "banks",
+      "variable_id": ":godley_deposits_banks",
+      "external_multiplier": 1.0,
+      "required": true
+    }
+  ],
+  "source_mode": "provided",
+  "observed_values": {
+    ":godley_deposits_households": 100.0,
+    ":godley_deposits_banks": -100.0
+  },
+  "absolute_tolerance": 0.000001,
+  "relative_tolerance": 0.000001,
+  "require_full_coverage": true
+}

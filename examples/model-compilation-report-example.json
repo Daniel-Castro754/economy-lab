@@ -1,0 +1,40 @@
+{
+  "status": "partial",
+  "applied_fields": [
+    "name",
+    "months",
+    "households",
+    "firms",
+    "banks",
+    "initial_inflation",
+    "initial_unemployment",
+    "policy_rate",
+    "income_tax",
+    "public_spending_change",
+    "activation_engine",
+    "household_behavior",
+    "financial_engine",
+    "macro_engine",
+    "macro_coupling",
+    "macro_recalibration",
+    "hark_income_groups",
+    "hark_income_risk_dispersion",
+    "shocks",
+    "applied_profiles"
+  ],
+  "partial_features": [
+    "A base econômica 'commodity_exporter' é descritiva; o Economy Zero ainda não possui matriz setorial completa.",
+    "O nível de desigualdade é aproximado por heterogeneidade HARK; a distribuição-alvo deve ser calibrada com dados reais.",
+    "Concentração bancária é aproximada pelo número de bancos; participação de mercado endógena ainda não está modelada."
+  ],
+  "unsupported_features": [
+    "commodity-sector: requer setores produtivos explícitos, previsto para etapa posterior."
+  ],
+  "assumptions": [
+    "O setor externo existe, mas a especialização setorial em commodities ainda é descritiva no ModelSpec.",
+    "Alta desigualdade é aproximada por maior heterogeneidade de risco/renda; a distribuição empírica ainda exige calibração.",
+    "Concentração bancária alta foi aproximada por 3 bancos quando nenhum número foi informado.",
+    "A proposta é um ModelSpec declarativo. Nenhum código, comando de shell ou transação contábil é gerado pela IA."
+  ],
+  "warning": "ModelSpec compila somente para contratos conhecidos. Recursos parciais permanecem explícitos e exigem revisão antes da simulação."
+}

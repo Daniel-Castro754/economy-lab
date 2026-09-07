@@ -1,0 +1,8 @@
+Economy Lab v2.13.2
+
+Execute "Economy Lab_2.13.2_x64-setup.exe", diretamente na raiz deste pacote.
+O instalador inclui o backend Python e a interface correspondentes ao código deste ZIP.
+Não é necessário instalar Python, Node.js ou Rust para usar o aplicativo.
+Mesa, HARK, Dynare e Minsky são opcionais e exigem configuração própria.
+Os projetos continuam no diretório de dados local do aplicativo, separado do instalador.
+Veja docs/REVISAO-v2.13.2.md para as mudanças e validações desta entrega.

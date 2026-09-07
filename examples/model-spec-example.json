@@ -1,0 +1,57 @@
+{
+  "schema_version": "economy-lab-modelspec-v1.0",
+  "name": "Modelo econômico",
+  "description": "Crie uma economia exportadora de commodities, com alta desigualdade e sistema bancário concentrado. Simule 36 meses com 8000 famílias, 140 empresas, inflação 5%, desemprego 8% e Selic 12%. Use HARK e Dynare em modo híbrido.",
+  "source_prompt": "Crie uma economia exportadora de commodities, com alta desigualdade e sistema bancário concentrado. Simule 36 meses com 8000 famílias, 140 empresas, inflação 5%, desemprego 8% e Selic 12%. Use HARK e Dynare em modo híbrido.",
+  "horizon_months": 36,
+  "population": {
+    "households": 8000,
+    "firms": 140,
+    "banks": 3
+  },
+  "engines": {
+    "agents": "native",
+    "households": "hark",
+    "financial": "native",
+    "macro": "dynare",
+    "macro_coupling": "hybrid",
+    "macro_recalibration": "static_irf"
+  },
+  "markets": {
+    "labor": true,
+    "goods": true,
+    "credit": true,
+    "external": true
+  },
+  "policy": {
+    "inflation": 5.0,
+    "unemployment": 8.0,
+    "policy_rate": 12.0,
+    "income_tax": 20.0,
+    "public_spending_change": 0.0
+  },
+  "traits": {
+    "economic_base": "commodity_exporter",
+    "inequality": "high",
+    "banking_concentration": "high",
+    "openness": "high"
+  },
+  "shocks": [],
+  "hark_income_groups": 5,
+  "hark_income_risk_dispersion": 0.55,
+  "requested_capabilities": [
+    "commodity-sector"
+  ],
+  "recommended_modules": [
+    "dynare",
+    "hark",
+    "minsky"
+  ],
+  "profile_refs": {},
+  "assumptions": [
+    "O setor externo existe, mas a especialização setorial em commodities ainda é descritiva no ModelSpec.",
+    "Alta desigualdade é aproximada por maior heterogeneidade de risco/renda; a distribuição empírica ainda exige calibração.",
+    "Concentração bancária alta foi aproximada por 3 bancos quando nenhum número foi informado.",
+    "A proposta é um ModelSpec declarativo. Nenhum código, comando de shell ou transação contábil é gerado pela IA."
+  ]
+}
