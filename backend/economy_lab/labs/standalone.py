@@ -72,7 +72,7 @@ def _gini(values: list[float]) -> float:
 
 def run_mesa_lab(*, agents: int = 100, steps: int = 100, initial_wealth: float = 10.0, transfer_amount: float = 1.0, seed: int = 42) -> dict[str, Any]:
     if not mesa_available():
-        raise EngineUnavailableError('Mesa Lab requer Mesa 3.5.x. Instale com: pip install -e ".[simulation]"')
+        raise EngineUnavailableError('Mesa Lab requer Mesa 3.5.x. Abra Configurações → Motores e instale Mesa e HARK; depois reabra o aplicativo.')
     import mesa
 
     class WealthAgent(mesa.Agent):
@@ -141,7 +141,7 @@ def run_hark_lab(
     points: int = 25,
 ) -> dict[str, Any]:
     if not hark_available():
-        raise EngineUnavailableError('HARK Lab requer Econ-ARK/HARK. Instale com: pip install -e ".[simulation]"')
+        raise EngineUnavailableError('HARK Lab requer Econ-ARK/HARK. Abra Configurações → Motores e instale Mesa e HARK; depois reabra o aplicativo.')
 
     policy = HarkConsumptionPolicy(
         crra=crra,
@@ -312,7 +312,7 @@ def run_mesa_component_lab(**params: Any) -> dict[str, Any]:
     behavioral parameters into the integrated simulator.
     """
     if not mesa_available():
-        raise EngineUnavailableError('Mesa Component Lab requer Mesa. Instale com: pip install -e ".[simulation]"')
+        raise EngineUnavailableError('Mesa Component Lab requer Mesa. Abra Configurações → Motores e instale Mesa e HARK; depois reabra o aplicativo.')
     import mesa
 
     component = str(params.get("component", "activation"))

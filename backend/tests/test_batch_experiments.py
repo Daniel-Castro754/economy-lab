@@ -1,6 +1,7 @@
 from economy_lab.core.schemas import BatchExperimentRequest, ScenarioSpec
 from economy_lab.experiments import run_batch_experiment
 from economy_lab.storage import ProjectStore
+from economy_lab.storage.experiments import ExperimentStoreMixin
 
 
 def tiny_base() -> ScenarioSpec:
@@ -39,3 +40,11 @@ def test_store_persists_experiment(tmp_path):
     assert store.status()["experiments"] == 1
     listed = store.list_experiments(project["id"])
     assert listed[0]["axis"] == "policy_rate"
+
+
+def test_project_store_composes_experiment_mixin():
+    assert issubclass(ProjectStore, ExperimentStoreMixin)
+    assert ProjectStore.save_experiment is ExperimentStoreMixin.save_experiment
+    assert ProjectStore.list_experiments is ExperimentStoreMixin.list_experiments
+    assert ProjectStore.get_experiment is ExperimentStoreMixin.get_experiment
+    assert ProjectStore._experiment_summary is ExperimentStoreMixin._experiment_summary

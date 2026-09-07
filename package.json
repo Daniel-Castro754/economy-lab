@@ -1,14 +1,18 @@
 {
   "name": "economy-lab",
   "private": true,
-  "version": "2.13.0",
+  "version": "2.14.0",
   "scripts": {
     "web": "npm --prefix frontend run dev",
     "web:build": "npm --prefix frontend run build",
     "desktop": "powershell -ExecutionPolicy Bypass -File scripts/dev-desktop.ps1",
     "desktop:build": "powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1",
     "desktop:check": "powershell -ExecutionPolicy Bypass -File scripts/check-desktop-prereqs.ps1",
-    "backend:qualify": "powershell -ExecutionPolicy Bypass -File scripts/validate-external-engines.ps1 -StrictQualification"
+    "backend:qualify": "powershell -ExecutionPolicy Bypass -File scripts/validate-external-engines.ps1 -StrictQualification",
+    "backend:test": "cd backend && .venv\\Scripts\\python.exe -m pytest -q",
+    "frontend:typecheck": "npm --prefix frontend run typecheck",
+    "frontend:build": "npm --prefix frontend run build",
+    "verify": "npm run backend:test && npm run frontend:typecheck && npm run frontend:build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

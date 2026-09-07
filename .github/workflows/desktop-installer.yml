@@ -6,7 +6,10 @@ name: Desktop installer
 #
 # The Python backend is bundled into the installer as a PyInstaller sidecar
 # (see scripts/build-sidecar.ps1), so the resulting installer needs nothing
-# preinstalled on the target machine: no Python, no Node, no Rust.
+# preinstalled on the target machine: no Python, no Node, no Rust. Optional
+# engines (Mesa/HARK) are installed later, on demand, into a separate
+# app-managed Python environment (Settings → Engines); prepare-runtime-tools.ps1
+# packages the uv binary + a backend wheel the app uses for that.
 #
 # Trigger manually from the Actions tab to test a build, or push a `v*` tag
 # to also publish the installer to a GitHub Release.
@@ -56,6 +59,10 @@ jobs:
           } else {
             ./scripts/build-sidecar.ps1 -SkipSimulationEngines
           }
+
+      - name: Prepare managed-runtime installer tools (uv + backend wheel)
+        shell: pwsh
+        run: ./scripts/prepare-runtime-tools.ps1
 
       - name: Install JS dependencies
         shell: pwsh

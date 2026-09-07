@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default permissions for the Economy Lab main window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open", "opener:default"]
 }

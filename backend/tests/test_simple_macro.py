@@ -1,4 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from economy_lab.main import app
 from economy_lab.simple import (
@@ -7,6 +9,15 @@ from economy_lab.simple import (
 )
 from economy_lab.simple.models import SimpleToAdvancedRequest
 from economy_lab.reporting import simple_csv_bytes, simple_xlsx_bytes
+
+
+def test_simple_contracts_reject_unknown_and_non_finite_values():
+    with pytest.raises(ValidationError):
+        SimpleInitialConfig(unknown=1)
+    with pytest.raises(ValidationError):
+        SimplePolicyDecision(interest_rate=float("nan"))
+    with pytest.raises(ValidationError):
+        SimplePolicyDecision(government_spending=float("inf"))
 
 
 def test_simple_baseline_runs_seven_years_deterministically():
@@ -93,3 +104,6 @@ def test_simple_api_flow():
     })
     assert step.status_code == 200
     assert step.json()["result"]["year"] == 1
+
+    rejected = client.post("/api/v1/simple/start", json={"scenario_id": "baseline", "unknown": True})
+    assert rejected.status_code == 422

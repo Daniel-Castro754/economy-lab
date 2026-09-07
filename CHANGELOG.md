@@ -1,4 +1,25 @@
+# v2.13.2 — revisão dos ajustes enviados
+
+- APIs e armazenamento modularizados; painéis de projetos e Profiles extraídos.
+- Validação de entradas, backup de migração SQLite e rastreabilidade das séries preservados.
+- Exportação usa o cenário da execução; Simple Macro impede operações simultâneas.
+- Inicialização e migrações SQLite atômicas, incluindo chamadas simultâneas na primeira abertura.
+- Reconexão consulta o mesmo job após falha de progresso, sem reenviar a simulação.
+- Falha ao atualizar o histórico não transforma uma execução concluída em erro.
+- Números inválidos retornam HTTP 422; falhas de integridade SQLite têm erro legível.
+- Scripts de build interrompem em falhas de dependências, PyInstaller e Tauri.
+- Testes de entradas inválidas e rotas adaptados à interface pública das dependências.
+
 # Economy Lab v2.13
+
+## v2.13.1 — Economy Zero observable e controles funcionais
+
+- Conecta o Economy Zero à fila persistente do backend com progresso mensal, etapa, cancelamento e timeout configurável.
+- Exibe resultado, falha e nova tentativa diretamente no painel, eliminando o estado indefinido de “Simulando…”.
+- Separa a rolagem de parâmetros e resultados para manter o retorno visível durante execuções longas.
+- Adiciona escala de teste rápido sem alterar a escala padrão nem as regras econômicas.
+- Implementa painéis reais de Configurações e Ajuda e conecta as abas da Simulation Lab às áreas correspondentes.
+- Mantém os motores externos opcionais, o modo Basic independente e o Ledger/SFC como autoridade contábil única.
 
 ## v2.13.0 — Tabler-inspired compact desktop design
 

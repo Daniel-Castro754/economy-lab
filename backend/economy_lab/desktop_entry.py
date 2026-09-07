@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 
 import uvicorn
 
@@ -31,6 +32,20 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Invalid TCP port")
 
     os.environ.setdefault("ECONOMY_LAB_RUNTIME_MODE", "desktop-sidecar")
+
+    from economy_lab.runtime.manager import active_python, load_paths, spawn, subprocess_env
+    load_paths()
+    python = active_python()
+    if python and os.getenv("ECONOMY_LAB_MANAGED_BACKEND") != "1":
+        env = subprocess_env()
+        env["ECONOMY_LAB_MANAGED_BACKEND"] = "1"
+        child = spawn([str(python), "-m", "economy_lab.desktop_entry", *(argv if argv is not None else sys.argv[1:])], env=env)
+        try:
+            return child.wait()
+        finally:
+            if child.poll() is None:
+                child.terminate()
+                child.wait(timeout=10)
 
     config = uvicorn.Config(
         app,

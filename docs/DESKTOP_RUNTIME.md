@@ -45,3 +45,11 @@ Use `-SkipSimulationEngines` directly with the PowerShell scripts when you need 
 The Tauri shell resolves its OS-specific application-data directory and passes it to the sidecar as `ECONOMY_LAB_DATA_DIR`. The backend stores `economy-lab.sqlite3` there, so projects survive application restarts and application upgrades that preserve the app-data directory.
 
 For diagnostics or portable development, `ECONOMY_LAB_DB_PATH` can override the exact SQLite file path.
+
+## v2.14 managed optional engines
+
+The Tauri resources now include a standalone uv executable and a wheel of the matching backend. The shell passes their absolute directory through ECONOMY_LAB_RUNTIME_RESOURCES. Configurações → Motores prepares an isolated per-user Python, installs the wheel with simulation extras and runs real engine verification before atomically activating it.
+
+On the next launch, the frozen sidecar delegates to that version-matched interpreter and forwards the loopback port, instance identifier and shutdown token. Windows DLL lookup inherited from PyInstaller is reset for external processes. PythonHOME/PYTHONPATH are not inherited. The desktop shell retains the same API discovery and shutdown contract.
+
+See MOTORES-INSTALACAO-v2.14.0.md for PATH commands, external program paths and recovery. The fixed install endpoint accepts no package name or shell command from the frontend.

@@ -339,37 +339,39 @@ def run_reference_nk_model(
             shutil.rmtree(workdir, ignore_errors=True)
         raise DynareExecutionError(f"falha ao iniciar Dynare/Octave: {exc}") from exc
 
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "erro sem saída").strip()
+    try:
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "erro sem saída").strip()
+            raise DynareExecutionError(f"Dynare/Octave retornou código {completed.returncode}: {detail[-3000:]}")
+
+        # Parsing can fail after a successful run (missing/unreadable
+        # *_results.mat, unexpected field layout); the workdir must still be
+        # cleaned up in that case, so it is covered by the same finally below.
+        results_file = _find_results_file(workdir, stem)
+        points = parse_dynare_irfs(results_file)
+
+        # Preserve the generated artifacts only when explicitly requested. The
+        # response still records their paths for diagnostics in keep_workdir mode.
+        return DynareMacroResult(
+            model_name="economy-lab-reference-nk",
+            model_kind="new-keynesian-dsge",
+            period_unit="quarter",
+            shock_name="monetary_policy",
+            shock_size_pp=float(monetary_shock_pp),
+            neutral_nominal_rate=float(neutral_nominal_rate),
+            beta=float(beta),
+            sigma=float(sigma),
+            kappa=float(kappa),
+            rho_i=float(rho_i),
+            phi_pi=float(phi_pi),
+            phi_x=float(phi_x),
+            points=points,
+            workdir=str(workdir) if keep_workdir else "temporary-cleaned",
+            results_file=str(results_file) if keep_workdir else "temporary-cleaned",
+        )
+    finally:
         if not keep_workdir:
             shutil.rmtree(workdir, ignore_errors=True)
-        raise DynareExecutionError(f"Dynare/Octave retornou código {completed.returncode}: {detail[-3000:]}")
-
-    results_file = _find_results_file(workdir, stem)
-    points = parse_dynare_irfs(results_file)
-
-    # Preserve the generated artifacts only when explicitly requested. The
-    # response still records their paths for diagnostics in keep_workdir mode.
-    result = DynareMacroResult(
-        model_name="economy-lab-reference-nk",
-        model_kind="new-keynesian-dsge",
-        period_unit="quarter",
-        shock_name="monetary_policy",
-        shock_size_pp=float(monetary_shock_pp),
-        neutral_nominal_rate=float(neutral_nominal_rate),
-        beta=float(beta),
-        sigma=float(sigma),
-        kappa=float(kappa),
-        rho_i=float(rho_i),
-        phi_pi=float(phi_pi),
-        phi_x=float(phi_x),
-        points=points,
-        workdir=str(workdir) if keep_workdir else "temporary-cleaned",
-        results_file=str(results_file) if keep_workdir else "temporary-cleaned",
-    )
-    if not keep_workdir:
-        shutil.rmtree(workdir, ignore_errors=True)
-    return result
 
 
 def irf_to_monthly_guidance(points: Iterable[DynareIRFPoint]) -> tuple[dict[str, float], ...]:

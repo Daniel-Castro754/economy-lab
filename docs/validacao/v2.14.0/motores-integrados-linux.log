@@ -1,0 +1,5 @@
+/workspace/scratch/4e274d56ab44/runtime-engine-qa/lib/python3.12/site-packages/mesa/mesa_logging.py:112: FutureWarning: The use of the `seed` keyword argument is deprecated, use `rng` instead. No functional changes.
+  res = func(*args, **kwargs)
+/workspace/scratch/4e274d56ab44/runtime-engine-qa/lib/python3.12/site-packages/mesa/mesa_logging.py:112: FutureWarning: The use of the `seed` keyword argument is deprecated, use `rng` instead. No functional changes.
+  res = func(*args, **kwargs)
+{"mesa": "ok", "hark": "ok", "economy_zero": "ok", "ledger": "balanced"}

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CalibrationAggregation, CalibrationComparisonMode, CalibrationFitResponse, CalibrationFrequency,
   CalibrationMetric, CalibrationParameter, CalibrationResponse, CalibrationStatistic, CalibrationTargetInput,
-  DataSourceCatalogItem, DataSourceId, EconomicSeries, HubModuleInfo, ScenarioSpec, SimulationResult
+  DataProvenanceRecord, DataSourceCatalogItem, DataSourceId, EconomicSeries, HubModuleInfo, ScenarioSpec, SimulationResult
 } from "../api";
 import {
   evaluateCalibration, exportCalibrationFile, fetchEconomicSeries, fitCalibration, listDataSources
@@ -28,6 +28,8 @@ const parameterLabels: Record<CalibrationParameter, string> = {
 };
 
 type TargetRow = CalibrationTargetInput & { localId: string };
+
+type CalibrationOperation = "load" | "calibrate" | "fit" | "export" | null;
 
 export function DataCalibrationWorkspace({
   module, scenario, result, onApplyScenario, onOpenSimulation
@@ -61,12 +63,28 @@ export function DataCalibrationWorkspace({
   const [trainingEndDate, setTrainingEndDate] = useState("");
   const [validationStartDate, setValidationStartDate] = useState("");
   const [status, setStatus] = useState("Carregue uma série e monte uma cesta de metas.");
+  const [operation, setOperation] = useState<CalibrationOperation>(null);
+  const operationRef = useRef<CalibrationOperation>(null);
+  const isOperating = operation !== null;
+
+  function beginOperation(next: Exclude<CalibrationOperation, null>) {
+    if (operationRef.current) return false;
+    operationRef.current = next;
+    setOperation(next);
+    return true;
+  }
+
+  function finishOperation() {
+    operationRef.current = null;
+    setOperation(null);
+  }
 
   useEffect(() => { listDataSources().then(setCatalog).catch(() => setCatalog([])); }, []);
   const activeSource = useMemo(() => catalog.find((item) => item.id === source), [catalog, source]);
   const recent = series?.observations.slice(-12) ?? [];
 
   async function loadSeries() {
+    if (!beginOperation("load")) return;
     setStatus("Consultando fonte pública…"); setCalibration(null); setFit(null);
     try {
       const source_options: Record<string, string> = {};
@@ -83,6 +101,7 @@ export function DataCalibrationWorkspace({
       setSeries(loaded);
       setStatus(`${loaded.observations.length} observações carregadas${loaded.cached ? " do cache local" : ""}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : "Falha ao consultar série."); }
+    finally { finishOperation(); }
   }
 
   function addTarget() {
@@ -105,7 +124,7 @@ export function DataCalibrationWorkspace({
   }
 
   async function calibrate() {
-    if (!result || !targets.length) return;
+    if (!result || !targets.length || !beginOperation("calibrate")) return;
     setStatus("Comparando cesta de metas com a simulação atual…"); setFit(null);
     try {
       const report = await evaluateCalibration({
@@ -113,10 +132,11 @@ export function DataCalibrationWorkspace({
       });
       setCalibration(report); setStatus(`Calibração multialvo · score ${report.score.toFixed(1)}/100.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : "Falha na calibração."); }
+    finally { finishOperation(); }
   }
 
   async function runFit() {
-    if (!targets.length || !fitParameters.length) return;
+    if (!targets.length || !fitParameters.length || !beginOperation("fit")) return;
     setStatus("Executando ajuste limitado; cada candidato reexecuta o Simulation Lab…");
     try {
       const fitted = await fitCalibration({
@@ -127,10 +147,38 @@ export function DataCalibrationWorkspace({
       setFit(fitted); setCalibration(fitted.final_calibration);
       setStatus(`Ajuste concluído · ${fitted.baseline_score.toFixed(1)} → ${fitted.best_score.toFixed(1)} em ${fitted.evaluations} avaliações.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : "Falha no ajuste limitado."); }
+    finally { finishOperation(); }
+  }
+
+  async function exportFile() {
+    if (!calibration || !beginOperation("export")) return;
+    try {
+      await exportCalibrationFile(scenario, calibration, fit);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Falha ao exportar arquivo de calibração.");
+    } finally {
+      finishOperation();
+    }
   }
 
   function applyPatch(patch: Record<string, number>) {
-    onApplyScenario({ ...scenario, ...patch });
+    if (operationRef.current) return;
+    const provenanceKey = (record: DataProvenanceRecord) => `${record.source_id}\u0000${record.series_id}\u0000${record.content_hash}`;
+    const provenanceSortKey = (record: DataProvenanceRecord) => [
+      provenanceKey(record), record.retrieved_at ?? "", record.observation_start ?? "", record.observation_end ?? "",
+      record.frequency ?? "", record.units ?? ""
+    ].join("\u0000");
+    const data_provenance = [
+      ...scenario.data_provenance,
+      ...targets.map((target) => target.series.provenance).filter((record): record is DataProvenanceRecord => record !== null && record !== undefined)
+    ]
+      .sort((left, right) => {
+        const leftKey = provenanceSortKey(left);
+        const rightKey = provenanceSortKey(right);
+        return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+      })
+      .filter((record, index, records) => index === 0 || provenanceKey(record) !== provenanceKey(records[index - 1]));
+    onApplyScenario({ ...scenario, ...patch, data_provenance });
     setStatus("Patch aplicado ao formulário do Simulation Lab. Revise antes de executar.");
   }
 
@@ -154,7 +202,7 @@ export function DataCalibrationWorkspace({
         {source === "world_bank" && <label>País<input value={country} onChange={(e) => setCountry(e.target.value)} /></label>}
         {source === "ibge_sidra" && <div className="inlineFields"><label>Períodos<input value={ibgePeriods} onChange={(e) => setIbgePeriods(e.target.value)} /></label><label>Variável<input value={ibgeVariable} onChange={(e) => setIbgeVariable(e.target.value)} /></label></div>}
         <div className="inlineFields"><label>Início<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label><label>Fim<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label></div>
-        <button type="button" onClick={loadSeries}>Carregar série</button>
+        <button type="button" onClick={loadSeries} disabled={isOperating}>Carregar série</button>
         {activeSource?.notes?.map((note) => <p className="muted" key={note}>{note}</p>)}
       </div>
 
@@ -179,7 +227,7 @@ export function DataCalibrationWorkspace({
       {!targets.length ? <p className="muted">Adicione inflação, desemprego, juros, PIB, crédito ou capital bancário. O score combina os pesos definidos.</p> : <div className="tableWrap"><table><thead><tr><th>Métrica</th><th>Série</th><th>Modo</th><th>Peso</th><th></th></tr></thead><tbody>{targets.map((target) => <tr key={target.localId}><td>{metricLabels[target.metric]}</td><td>{target.series.source}:{target.series.series_id}</td><td>{target.comparison_mode === "aligned_path" ? `trajetória · ${target.alignment_frequency}` : target.statistic}</td><td>{target.weight ?? 1}</td><td><button type="button" className="secondaryButton" onClick={() => removeTarget(target.localId)}>Remover</button></td></tr>)}</tbody></table></div>}
       <label>Data inicial da simulação para alinhamento<input type="date" value={simulationStartDate} onChange={(e) => setSimulationStartDate(e.target.value)} /></label>
       <p className="muted">Se ficar vazio, a v2.6 ancora o último mês simulado na observação real mais recente. Para pesquisas reproduzíveis, informe uma data.</p>
-      <div className="moduleActions"><button type="button" onClick={calibrate} disabled={!result || !targets.length}>Avaliar cesta</button>{!result && <button type="button" className="secondaryButton" onClick={onOpenSimulation}>Executar simulação primeiro</button>}</div>
+      <div className="moduleActions"><button type="button" onClick={calibrate} disabled={!result || !targets.length || isOperating}>Avaliar cesta</button>{!result && <button type="button" className="secondaryButton" onClick={onOpenSimulation}>Executar simulação primeiro</button>}</div>
     </div>
 
     <div className="panelInset">
@@ -188,20 +236,20 @@ export function DataCalibrationWorkspace({
       <div className="engineBadges">{(Object.keys(parameterLabels) as CalibrationParameter[]).map((parameter) => <label key={parameter} className={fitParameters.includes(parameter) ? "available" : "optional"}><input type="checkbox" checked={fitParameters.includes(parameter)} onChange={() => toggleParameter(parameter)} /> {parameterLabels[parameter]}</label>)}</div>
       <div className="inlineFields"><label>Fim do treino<input type="date" value={trainingEndDate} onChange={(e) => setTrainingEndDate(e.target.value)} /></label><label>Início da validação<input type="date" value={validationStartDate} onChange={(e) => setValidationStartDate(e.target.value)} /></label></div>
       <p className="muted">Preencha as duas datas para reservar uma janela histórica que não influencia a busca e serve apenas para validação fora da amostra.</p>
-      <button type="button" onClick={runFit} disabled={!targets.length || !fitParameters.length}>Procurar patch melhor</button>
+      <button type="button" onClick={runFit} disabled={!targets.length || !fitParameters.length || isOperating}>Procurar patch melhor</button>
     </div>
 
     {calibration && <div className="panelInset"><h3>Resultado da calibração</h3><div className="metricCards"><div><span>Score</span><strong>{calibration.score.toFixed(1)}/100</strong></div><div><span>Erro normalizado</span><strong>{calibration.normalized_rmse.toFixed(3)}</strong></div></div>
       <div className="tableWrap"><table><thead><tr><th>Métrica</th><th>Modo</th><th>Real</th><th>Simulado</th><th>Erro</th><th>N alinhado</th></tr></thead><tbody>{calibration.metrics.map((item, index) => <tr key={`${item.metric}-${item.series_id}-${index}`}><td>{metricLabels[item.metric]}</td><td>{item.comparison_mode}</td><td>{item.real_value.toFixed(3)}</td><td>{item.simulated_value.toFixed(3)}</td><td>{item.error.toFixed(3)}</td><td>{item.aligned_observations}</td></tr>)}</tbody></table></div>
       <p className="warning">{calibration.warning}</p>
-      <div className="moduleActions"><button type="button" onClick={() => applyPatch(calibration.suggested_scenario_patch)} disabled={!Object.keys(calibration.suggested_scenario_patch).length}>Aplicar patch inicial</button><button type="button" className="secondaryButton" onClick={() => exportCalibrationFile(scenario, calibration, fit)}>Exportar Excel</button><button type="button" className="secondaryButton" onClick={onOpenSimulation}>Abrir Simulation Lab</button></div>
+      <div className="moduleActions"><button type="button" onClick={() => applyPatch(calibration.suggested_scenario_patch)} disabled={!Object.keys(calibration.suggested_scenario_patch).length || isOperating}>Aplicar patch inicial</button><button type="button" className="secondaryButton" onClick={() => void exportFile()} disabled={isOperating}>Exportar Excel</button><button type="button" className="secondaryButton" onClick={onOpenSimulation}>Abrir Simulation Lab</button></div>
     </div>}
 
     {fit && <div className="panelInset"><h3>Ajuste limitado</h3><div className="metricCards"><div><span>Baseline</span><strong>{fit.baseline_score.toFixed(1)}</strong></div><div><span>Melhor score</span><strong>{fit.best_score.toFixed(1)}</strong></div><div><span>Avaliações</span><strong>{fit.evaluations}</strong></div></div>
       {fit.validation_score != null && <p><strong>Score fora da amostra:</strong> {fit.validation_score.toFixed(1)}/100</p>}
       <div className="tableWrap"><table><thead><tr><th>Parâmetro</th><th>Valor sugerido</th></tr></thead><tbody>{Object.entries(fit.best_scenario_patch).map(([key, value]) => <tr key={key}><td>{parameterLabels[key as CalibrationParameter] ?? key}</td><td>{value.toFixed(4)}</td></tr>)}</tbody></table></div>
       <p className="warning">{fit.warning}</p>
-      <button type="button" onClick={() => applyPatch(fit.best_scenario_patch)} disabled={!Object.keys(fit.best_scenario_patch).length}>Aplicar melhor patch ao formulário</button>
+      <button type="button" onClick={() => applyPatch(fit.best_scenario_patch)} disabled={!Object.keys(fit.best_scenario_patch).length || isOperating}>Aplicar melhor patch ao formulário</button>
     </div>}
   </section>;
 }

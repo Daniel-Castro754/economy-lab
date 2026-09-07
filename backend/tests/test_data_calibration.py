@@ -11,13 +11,35 @@ from economy_lab.core.schemas import (
     CalibrationRequest,
     CalibrationTargetSpec,
     DataFetchRequest,
+    DataProvenanceRecord,
     EconomicObservation,
     EconomicSeriesResponse,
     ScenarioSpec,
 )
 from economy_lab.core.simulation import run_simulation
-from economy_lab.data.service import fetch_economic_series
+from economy_lab.data.service import _canonical_observations_hash, fetch_economic_series
+import economy_lab.data.connectors as connectors
 from economy_lab.reporting import calibration_xlsx_bytes
+
+
+def test_default_json_fetcher_rejects_oversized_response(monkeypatch):
+    class FakeResponse:
+        headers: dict[str, str] = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def read(self, _limit: int) -> bytes:
+            return b"12345"
+
+    monkeypatch.setattr(connectors, "_MAX_JSON_RESPONSE_BYTES", 4)
+    monkeypatch.setattr(connectors, "urlopen", lambda *_args, **_kwargs: FakeResponse())
+
+    with pytest.raises(ValueError, match="exceeds the allowed size"):
+        connectors.default_json_fetcher("https://example.invalid/data", 2)
 
 
 def test_bcb_connector_normalizes_and_caches(tmp_path, monkeypatch):
@@ -26,7 +48,11 @@ def test_bcb_connector_normalizes_and_caches(tmp_path, monkeypatch):
 
     def fetcher(url: str, timeout: int):
         calls.append((url, timeout))
-        return [{"data": "01/01/2026", "valor": "12,25"}, {"data": "02/01/2026", "valor": "12.50"}]
+        return [
+            {"data": "01/01/2026", "valor": "12,25"},
+            {"data": "02/01/2026", "valor": "12.50"},
+            {"data": "03/01/2026", "valor": "NaN"},
+        ]
 
     query = DataFetchRequest(source="bcb_sgs", series_id="432", start_date="2026-01-01", end_date="2026-01-02")
     first = fetch_economic_series(query, fetcher=fetcher)
@@ -37,6 +63,117 @@ def test_bcb_connector_normalizes_and_caches(tmp_path, monkeypatch):
     second = fetch_economic_series(query, fetcher=lambda *_: (_ for _ in ()).throw(AssertionError("cache miss")))
     assert second.cached is True
     assert len(calls) == 1
+
+
+def test_fetch_generates_provenance_record(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_DATA_CACHE", str(tmp_path))
+
+    def fetcher(url: str, timeout: int):
+        return [{"data": "01/01/2026", "valor": "12,25"}, {"data": "02/01/2026", "valor": "12.50"}]
+
+    query = DataFetchRequest(source="bcb_sgs", series_id="432", start_date="2026-01-01", end_date="2026-01-02")
+    result = fetch_economic_series(query, fetcher=fetcher)
+    assert result.provenance is not None
+    prov = result.provenance
+    assert prov.source_id == "bcb_sgs"
+    assert prov.series_id == "432"
+    assert len(prov.content_hash) == 64
+    assert prov.content_hash == _canonical_observations_hash(result.observations)
+    assert prov.observation_start == "2026-01-01"
+    assert prov.observation_end == "2026-01-02"
+    assert prov.retrieved_at is not None
+
+
+def test_cache_preserves_provenance(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_DATA_CACHE", str(tmp_path))
+
+    def fetcher(url: str, timeout: int):
+        return [{"data": "01/01/2026", "valor": "5.00"}]
+
+    query = DataFetchRequest(source="bcb_sgs", series_id="433")
+    first = fetch_economic_series(query, fetcher=fetcher)
+    assert first.provenance is not None
+    second = fetch_economic_series(query, fetcher=lambda *_: (_ for _ in ()).throw(AssertionError("cache miss")))
+    assert second.cached is True
+    assert second.provenance is not None
+    assert second.provenance.content_hash == first.provenance.content_hash
+    assert second.provenance.source_id == first.provenance.source_id
+
+
+def test_cache_invalidates_on_provenance_hash_mismatch(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_DATA_CACHE", str(tmp_path))
+
+    def fetcher(url: str, timeout: int):
+        return [{"data": "01/01/2026", "valor": "3.00"}]
+
+    query = DataFetchRequest(source="bcb_sgs", series_id="999")
+    fetch_economic_series(query, fetcher=fetcher)
+    # Corrupt the cached provenance hash
+    cache_files = list(tmp_path.glob("*.json"))
+    assert len(cache_files) == 1
+    content = json.loads(cache_files[0].read_text(encoding="utf-8"))
+    content["provenance"]["content_hash"] = "0" * 64
+    cache_files[0].write_text(json.dumps(content), encoding="utf-8")
+    # Next fetch should invalidate cache and call the fetcher again
+    calls = []
+    def counting_fetcher(url: str, timeout: int):
+        calls.append(1)
+        return [{"data": "01/01/2026", "valor": "3.00"}]
+    result = fetch_economic_series(query, fetcher=counting_fetcher)
+    assert result.cached is False
+    assert len(calls) == 1
+    assert result.provenance is not None
+
+
+def test_cache_invalidates_on_provenance_metadata_mismatch(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_DATA_CACHE", str(tmp_path))
+
+    def fetcher(url: str, timeout: int):
+        return [{"data": "01/01/2026", "valor": "9.00"}]
+
+    query = DataFetchRequest(source="bcb_sgs", series_id="777")
+    fetch_economic_series(query, fetcher=fetcher)
+    cache_files = list(tmp_path.glob("*.json"))
+    assert len(cache_files) == 1
+    content = json.loads(cache_files[0].read_text(encoding="utf-8"))
+    # Corrupt metadata (source_id) while keeping content_hash intact
+    content["provenance"]["source_id"] = "tampered"
+    cache_files[0].write_text(json.dumps(content), encoding="utf-8")
+    calls = []
+    def counting_fetcher(url: str, timeout: int):
+        calls.append(1)
+        return [{"data": "01/01/2026", "valor": "9.00"}]
+    result = fetch_economic_series(query, fetcher=counting_fetcher)
+    assert result.cached is False
+    assert len(calls) == 1
+    assert result.provenance.source_id == "bcb_sgs"
+
+
+def test_legacy_cache_without_provenance_derives_and_regraves(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECONOMY_LAB_DATA_CACHE", str(tmp_path))
+
+    def fetcher(url: str, timeout: int):
+        return [{"data": "01/01/2026", "valor": "7.00"}]
+
+    query = DataFetchRequest(source="bcb_sgs", series_id="legacy")
+    fetch_economic_series(query, fetcher=fetcher)
+    # Simulate a legacy cache entry by stripping provenance
+    cache_files = list(tmp_path.glob("*.json"))
+    assert len(cache_files) == 1
+    content = json.loads(cache_files[0].read_text(encoding="utf-8"))
+    del content["provenance"]
+    cache_files[0].write_text(json.dumps(content), encoding="utf-8")
+    # Next read should derive provenance and return it (no network call)
+    result = fetch_economic_series(query, fetcher=lambda *_: (_ for _ in ()).throw(AssertionError("should use cache")))
+    assert result.cached is True
+    assert result.provenance is not None
+    assert result.provenance.source_id == "bcb_sgs"
+    assert result.provenance.series_id == "legacy"
+    assert result.provenance.content_hash == _canonical_observations_hash(result.observations)
+    # Verify the cache file was regraved with provenance
+    regraved = json.loads(cache_files[0].read_text(encoding="utf-8"))
+    assert regraved["provenance"] is not None
+    assert regraved["provenance"]["content_hash"] == result.provenance.content_hash
 
 
 def test_world_bank_connector_parses_json(tmp_path, monkeypatch):

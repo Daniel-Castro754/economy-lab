@@ -1,14 +1,16 @@
 # Economy Lab
 
-## Current version: v2.11 — reproducible run manifests and replay
+## Current version: v2.14.0 — instalação integrada de motores opcionais
 
 Economy Lab is a local-first economic simulation hub with Simple Macro, Economy Zero and Hybrid simulation levels plus independent Dynare/Minsky/Mesa/HARK labs, profiles, real-data/calibration tooling and safe ModelSpec support.
 
+Para instalar Mesa e HARK pelo aplicativo, consulte [Configurações → Motores](docs/MOTORES-INSTALACAO-v2.14.0.md). O instalador base funciona com motores nativos; instalar pacotes no Python do Windows não altera o backend incorporado.
+
 ### Backend Completion phase
 
-v2.11 is the fifth controlled milestone on the path to **v3.0 Backend Freeze**. Visual redesign and new economic domains remain frozen.
+v2.14.0 is the current source version and controlled milestone on the path to **v3.0 Backend Freeze**. The v2.11 reproducibility contract remains part of that baseline; visual redesign and new economic domains remain frozen.
 
-The key backend contract is now executable, not only documented:
+v2.13.1 makes the persistent Economy Zero job flow observable in the desktop UI, with progress, cancellation, timeout handling, result/failure display and retry controls. It preserves the v2.11 manifest and replay guarantees below.
 
 - Economy Zero ABM owns realized GDP, inflation, unemployment and productive capital.
 - Ledger/SFC owns deposits, credit, reserves, debts and bank capital.
@@ -45,7 +47,7 @@ See `docs/REPRODUCIBILITY_V211.md`, `docs/SIMULATION_JOBS_V210.md`, `docs/ROADMA
 Two terminals:
 
 ```powershell
-# terminal 1 — backend (Python 3.12)
+# terminal 1 — backend (Python 3.12+)
 powershell -ExecutionPolicy Bypass -File scripts\dev-backend.ps1
 
 # terminal 2 — frontend
@@ -53,7 +55,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev-web.ps1
 ```
 
 Open `http://127.0.0.1:5173`. On macOS/Linux, run the equivalent commands
-inside each script manually (`py -3.12`/`python3.12` venv + `uvicorn
+inside each script manually (create a venv with any compatible Python 3.12+ interpreter, run `uvicorn
 economy_lab.main:app --reload`, then `npm install && npm run dev` in
 `frontend`).
 
@@ -69,9 +71,14 @@ GitHub Actions workflow builds one on a Windows runner and:
 - publishes it to the repository's [Releases](../../releases) page when a
   `v*` tag is pushed.
 
-The installer bundles the Python backend as a PyInstaller sidecar, so it
-needs nothing preinstalled on the target machine — no Python, Node or Rust.
-See `docs/DESKTOP_RUNTIME.md` for how the sidecar and shutdown handshake work,
-and `scripts/build-desktop.ps1` if you want to build one locally on Windows
-(requires Python 3.12, Node.js and the Rust/MSVC toolchain — check with `npm
-run desktop:check`).
+The resulting installer bundles the Python backend as a PyInstaller sidecar
+(no Python/Node/Rust needed on the target machine) and also carries the
+`uv`-based managed-runtime tooling used to install optional engines
+(Mesa/HARK) on demand from **Settings → Engines** — see
+`docs/MOTORES-INSTALACAO-v2.14.0.md` for how that works and
+`docs/validacao/v2.14.0/` for validation evidence.
+
+To build one locally on Windows: `npm run desktop:check` to verify
+prerequisites (Python 3.12, Node.js, Rust/MSVC), then `npm run verify`
+(backend tests + frontend typecheck/build) before `npm run desktop:build`.
+See `docs/DESKTOP_RUNTIME.md` for the sidecar and shutdown handshake.

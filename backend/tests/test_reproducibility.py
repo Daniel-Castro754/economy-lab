@@ -213,7 +213,7 @@ def test_replay_api_matches_source_run(tmp_path, monkeypatch):
     project = store.create_project(name="Replay", description="", scenario=spec)
     source = store.save_run(
         project_id=project["id"], scenario=spec, result=run_simulation(spec),
-        duration_ms=1, engine_version="2.13.0"
+        duration_ms=1, engine_version="2.14.0"
     )
     monkeypatch.setattr(routes, "_project_store", lambda: store)
 
@@ -274,3 +274,48 @@ def test_manifest_api_rejects_tampered_manifest(tmp_path, monkeypatch):
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Stored run manifest hash is invalid"
+
+
+def test_scenario_extra_fields_rejected():
+    """ScenarioSpec with extra='forbid' must reject unknown fields."""
+    import pytest
+    with pytest.raises(Exception):
+        ScenarioSpec(
+            name="Strict", months=2, households=120, firms=8, banks=2,
+            seed=1, totally_bogus_field=99,
+        )
+
+
+def test_scenario_nan_rejected():
+    """ScenarioSpec must reject NaN in float fields."""
+    import pytest
+    with pytest.raises(Exception):
+        ScenarioSpec(
+            name="NaN", months=2, households=120, firms=8, banks=2,
+            seed=1, initial_inflation=float("nan"),
+        )
+
+
+def test_scenario_inf_rejected():
+    """ScenarioSpec must reject Inf in float fields."""
+    import pytest
+    with pytest.raises(Exception):
+        ScenarioSpec(
+            name="Inf", months=2, households=120, firms=8, banks=2,
+            seed=1, policy_rate=float("inf"),
+        )
+
+
+def test_provenance_record_roundtrips_through_scenario():
+    """DataProvenanceRecord survives ScenarioSpec serialization."""
+    prov = DataProvenanceRecord(
+        source_id="bcb_sgs", series_id="432",
+        content_hash="c" * 64, retrieved_at="2026-09-01T00:00:00+00:00",
+        observation_start="2026-01-01", observation_end="2026-06-30",
+        frequency="monthly", units="%",
+    )
+    spec = demo_spec(data_provenance=[prov])
+    roundtripped = ScenarioSpec.model_validate_json(spec.model_dump_json())
+    assert roundtripped.data_provenance[0].content_hash == "c" * 64
+    assert roundtripped.data_provenance[0].source_id == "bcb_sgs"
+    assert stable_hash(spec) == stable_hash(roundtripped)
